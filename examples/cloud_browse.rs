@@ -1,6 +1,6 @@
 //! A cloud directory browser without the cloud: the listings come from a fake backend that answers every request one tick late, so the `activate → NeedsLoad → set_children` round-trip and its loading states behave like a real network drive.
 //!
-//! The bar above the cabinet demos the configuration hooks with dropdowns: the [`iced::Theme`] (including a reproduction of Syncative's palette and [`iced_fabi::Style`]), the file/folder [`iced_fabi::RowIcons`] (Tabler, or the vendored multicolour Material Icon Theme), the [`iced_fabi::Separators`] grid, the zebra stripe behind every second row, and what happens to toolbar tools that are not currently applicable (greyed out, or hidden outright). The toolbar itself shows the [`iced_fabi::Tool`] API (select all, deselect, copy, paste, delete — in three groups divided by [`iced_fabi::Cabinet::tool_separator`], enabled per state, and copy/paste carries whole folder subtrees), and the column list gets one custom [`TypeColumn`].
+//! The bar above the cabinet demos the configuration hooks with dropdowns: the [`iced::Theme`] (including a reproduction of Syncative's palette and [`iced_fabi::Style`]), the file/folder [`iced_fabi::RowIcons`] (Tabler, or the vendored multicolour Material Icon Theme), the [`iced_fabi::Separators`] grid, the zebra stripe behind every second row, the checkbox column, and what happens to toolbar tools that are not currently applicable (greyed out, or hidden outright). The toolbar itself shows the [`iced_fabi::Tool`] API (copy, paste, delete — in two groups divided by [`iced_fabi::Cabinet::tool_separator`], enabled per state, and copy/paste carries whole folder subtrees); selecting is done purely through the checkboxes. The column list gets one custom [`TypeColumn`].
 //!
 //! Run: `cargo run --example cloud_browse` — then switch modes with the icon in the top right, tap folders to drill down, tap the boxes to select, and watch the parent markers turn into dots.
 
@@ -26,8 +26,6 @@ fn main() -> iced::Result {
 #[derive(Debug, Clone)]
 enum Message {
     Cabinet(Event),
-    SelectAll,
-    DeselectAll,
     Copy,
     Paste,
     Delete,
@@ -628,14 +626,6 @@ impl App {
                     Task::none()
                 }
             },
-            Message::SelectAll => {
-                self.browser.select_all();
-                Task::none()
-            }
-            Message::DeselectAll => {
-                self.browser.clear_selection();
-                Task::none()
-            }
             Message::Checkboxes(choice) => {
                 self.checkboxes = choice;
                 Task::none()
@@ -869,20 +859,7 @@ impl App {
                 .text_size(SYNCATIVE_TEXT)
                 .scrollbar(syncative_scroll_direction(), syncative_scrollbar);
         }
-        // Three tool groups — selection, clipboard, delete — divided by thin upright lines. With "hidden" inactive tools a whole group can be missing; the cabinet then drops the stray dividers itself.
-        if show(has_selection) {
-            cabinet = cabinet.tool(
-                tool(icondata::TbListCheckOutline, |_| Message::SelectAll)
-                    .when(move |_| has_selection),
-            );
-        }
-        if show(has_selection) {
-            cabinet = cabinet.tool(
-                tool(icondata::TbMinusOutline, |_| Message::DeselectAll)
-                    .when(move |_| has_selection),
-            );
-        }
-        cabinet = cabinet.tool_separator();
+        // Two tool groups — clipboard and delete — divided by a thin upright line; selection itself is driven only by the checkboxes. With "hidden" inactive tools a whole group can be missing; the cabinet then drops the stray dividers itself.
         if show(has_selection) {
             cabinet = cabinet.tool(
                 tool(icondata::TbCopyOutline, |_| Message::Copy).when(move |_| has_selection),
