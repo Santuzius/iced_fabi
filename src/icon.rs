@@ -1,4 +1,4 @@
-//! SVG glyphs from the Tabler icon pack (via `icondata`), one cached [`svg::Handle`] per glyph.
+//! SVG glyphs of the widget: one cached [`svg::Handle`] per glyph, the glyph constants, and the [`RowIcons`] hook with its built-in [`TablerIcons`] implementation.
 //!
 //! Each glyph's SVG document is built once from the icon's raw path data and its handle kept for the process lifetime (keyed by the static's address); colour comes from the svg widget's tint filter, so light/dark switches never rebuild a handle. Same approach syncative uses for its status icons.
 
@@ -46,7 +46,7 @@ fn svg_document(glyph: icondata::Icon) -> String {
 }
 
 /// Glyph at `size` px, tinted by `colour`.
-pub fn glyph<'a>(
+pub(crate) fn glyph<'a>(
     icon: icondata::Icon,
     size: f32,
     colour: std::rc::Rc<dyn Fn(&Theme) -> Color + 'a>,
@@ -63,7 +63,7 @@ where
 }
 
 /// Glyph at `size` px keeping the SVG's own colours — for multicolour icon themes (tiny-skia's style colour is a post-render filter, so `None` leaves the artwork untouched).
-pub fn natural<'a>(icon: icondata::Icon, size: f32) -> Svg<'a, Theme>
+pub(crate) fn natural<'a>(icon: icondata::Icon, size: f32) -> Svg<'a, Theme>
 where
     Theme: iced_widget::svg::Catalog,
 {
@@ -113,3 +113,36 @@ pub const TREE: icondata::Icon = icondata::TbSitemapOutline;
 pub const SORT_ASCENDING: icondata::Icon = icondata::TbSortAscendingOutline;
 pub const SORT_DESCENDING: icondata::Icon = icondata::TbSortDescendingOutline;
 pub const ERROR: icondata::Icon = icondata::TbAlertCircleOutline;
+
+// --- the row-icon hook an app configures on the cabinet ---
+
+use crate::browser::node::Node;
+
+/// Chooses the file and folder glyphs shown on the rows; see [`icons`](crate::Cabinet::icons).
+///
+/// The built-in default is [`TablerIcons`]. An app with its own icon theme implements this and hands it to the cabinet; the demo wires the same up to a dropdown.
+pub trait RowIcons {
+    /// The folder row's glyph; `open` when its branch is expanded (tree mode).
+    fn folder(&self, node: &Node, open: bool) -> icondata::Icon;
+
+    /// The file row's glyph for this entry — pick by extension or MIME, whatever your theme keys on.
+    fn file(&self, node: &Node) -> icondata::Icon;
+
+    /// Whether glyphs are repainted in the widget's colours ([`folder`](crate::Style::folder), [`text`](crate::Style::text)). `true` suits monochrome packs (Tabler); `false` keeps a multicolour pack's own fills (Material Icon Theme).
+    fn tinted(&self) -> bool {
+        true
+    }
+}
+
+/// The built-in [`RowIcons`]: Tabler folder / open-folder / file, tinted like the rest of the widget.
+pub struct TablerIcons;
+
+impl RowIcons for TablerIcons {
+    fn folder(&self, _node: &Node, open: bool) -> icondata::Icon {
+        if open { FOLDER_OPEN } else { FOLDER }
+    }
+
+    fn file(&self, _node: &Node) -> icondata::Icon {
+        FILE
+    }
+}

@@ -1,0 +1,118 @@
+//! The column header: the select-all box, the sort buttons and the selection count.
+
+use std::rc::Rc;
+
+use iced_widget::{
+    Space, button, container,
+    core::{Alignment, Background, Element, Font, Length, Theme},
+    row,
+};
+
+use super::Cabinet;
+use super::paint::{CARET, CELL_PAD, ColourField, EDGE, GAP, MARKER_CELL, ROW_HEIGHT};
+use crate::{Marker, browser::Mode};
+
+impl<'a, Message: Clone + 'a, Renderer> Cabinet<'a, Message, Renderer>
+where
+    Renderer: iced_widget::core::text::Renderer<Font = Font>
+        + iced_widget::core::svg::Renderer
+        + iced_widget::core::Renderer
+        + 'a,
+{
+    /// The select-all box and the sort headers — or, while something is selected, the selection count.
+    pub(super) fn column_header(&self) -> Element<'a, Message, Theme, Renderer> {
+        let marker = self
+            .boxes_shown()
+            .then(|| self.marker_button(self.browser.scope_marker(), crate::Event::ToggleAll));
+        let tree = self.browser.mode() == Mode::Tree;
+        let content = if self.browser.has_selection() {
+            let count = self.browser.selected().count();
+            let count =
+                container(self.strong(format!("{count} selected"))).padding([0.0, CELL_PAD]);
+            match marker {
+                Some(marker) => row![
+                    container(marker).center_x(Length::Fixed(MARKER_CELL)),
+                    count
+                ]
+                .height(Length::Fixed(ROW_HEIGHT))
+                .padding([0.0, EDGE])
+                .align_y(Alignment::Center)
+                .into(),
+                None => row![count]
+                    .height(Length::Fixed(ROW_HEIGHT))
+                    .padding([0.0, EDGE])
+                    .align_y(Alignment::Center)
+                    .into(),
+            }
+        } else {
+            let mut headers: Vec<Element<'a, Message, Theme, Renderer>> =
+                (0..self.browser.columns().len())
+                    .map(|index| self.sort_button(index))
+                    .collect();
+            let mut name = headers.remove(0);
+            if tree {
+                // In tree mode the label starts where the top level's glyphs do, behind the caret slot.
+                name = row![Space::new().width(Length::Fixed(CARET + GAP)), name].into();
+            }
+            self.template(
+                marker.unwrap_or_else(|| iced_widget::Space::new().into()),
+                name,
+                headers,
+            )
+        };
+        let style = Rc::clone(&self.style);
+        container(content)
+            .width(Length::Fill)
+            .style(move |theme: &Theme| container::Style {
+                background: Some(Background::Color(style(theme).header)),
+                ..container::Style::default()
+            })
+            .into()
+    }
+
+    /// One column's header: its title, plus the direction arrow when the list is sorted by it.
+    fn sort_button(&self, index: usize) -> Element<'a, Message, Theme, Renderer> {
+        let (sort_column, ascending) = self.browser.sort();
+        let mut title = row![self.label(self.browser.columns()[index].header())]
+            .spacing(4)
+            .align_y(Alignment::Center);
+        if sort_column == index {
+            let arrow = if ascending {
+                crate::icon::SORT_ASCENDING
+            } else {
+                crate::icon::SORT_DESCENDING
+            };
+            title = title.push(self.glyph(arrow, 14.0, ColourField::Accent));
+        }
+        let colour = self.colour(ColourField::Text);
+        button(
+            container(title)
+                .height(Length::Fill)
+                .align_y(Alignment::Center),
+        )
+        .padding(0)
+        .width(Length::Fill)
+        .height(Length::Fill)
+        .style(move |theme, _| button::Style {
+            text_color: colour(theme),
+            ..button::Style::default()
+        })
+        .on_press((self.on_event)(crate::Event::Sort(index)))
+        .into()
+    }
+
+    pub(super) fn marker_button(
+        &self,
+        marker: Marker,
+        event: crate::Event,
+    ) -> Element<'a, Message, Theme, Renderer> {
+        let (glyph, field) = match marker {
+            Marker::Unselected => (crate::icon::SQUARE_OUTLINE, ColourField::Muted),
+            Marker::Selected => (crate::icon::CHECKBOX, ColourField::Accent),
+            Marker::Partial => (crate::icon::SQUARE_DOT, ColourField::Accent),
+        };
+        self.icon_button(glyph, 20.0, 28.0, field)
+            .on_press((self.on_event)(event))
+            .into()
+    }
+}

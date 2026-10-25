@@ -1,0 +1,106 @@
+use crate::browser::Browser;
+use crate::browser::{Entry, EntryKind, NodeId};
+
+#[test]
+fn pruning_removes_selections_of_gone_entries() {
+    let mut browser = Browser::sample();
+    let file = NodeId::derive(NodeId::ROOT, EntryKind::File, "notes.txt");
+    browser.toggle(file);
+    browser.set_children(
+        NodeId::ROOT,
+        vec![Entry {
+            name: "Finanzen".into(),
+            kind: EntryKind::Folder,
+            size: None,
+            modified: None,
+        }],
+    );
+    assert!(!browser.has_selection());
+    assert!(!browser.nodes.contains_key(&file));
+}
+
+#[test]
+fn remove_selected_deletes_and_prunes() {
+    let mut browser = Browser::sample();
+    let folder = NodeId::derive(NodeId::ROOT, EntryKind::Folder, "Finanzen");
+    browser.activate(folder);
+    browser.set_children(
+        folder,
+        vec![Entry {
+            name: "Krypto".into(),
+            kind: EntryKind::Folder,
+            size: None,
+            modified: None,
+        }],
+    );
+    let krypto = NodeId::derive(folder, EntryKind::Folder, "Krypto");
+    let file = NodeId::derive(NodeId::ROOT, EntryKind::File, "notes.txt");
+    browser.goto(krypto);
+    browser.toggle(folder);
+    browser.goto(NodeId::ROOT);
+    browser.toggle(file);
+    browser.remove_selected();
+    assert!(
+        !browser.nodes.contains_key(&folder),
+        "the folder node is gone"
+    );
+    assert!(
+        !browser.nodes.contains_key(&krypto),
+        "so is its whole subtree"
+    );
+    assert!(!browser.nodes.contains_key(&file));
+    let root = browser.node(NodeId::ROOT).expect("root");
+    assert!(root.children.is_empty(), "the listing lost both");
+    assert!(root.children_known, "the parent stays a known listing");
+    assert!(!browser.expanded.contains(&folder), "expansion pruned");
+    assert!(
+        !browser.has_selection(),
+        "a done tool leaves nothing checked"
+    );
+}
+
+#[test]
+fn remove_drops_nested_ids_once_and_refuses_the_root() {
+    let mut browser = Browser::sample();
+    let folder = NodeId::derive(NodeId::ROOT, EntryKind::Folder, "Finanzen");
+    browser.activate(folder);
+    browser.set_children(
+        folder,
+        vec![Entry {
+            name: "Krypto".into(),
+            kind: EntryKind::Folder,
+            size: None,
+            modified: None,
+        }],
+    );
+    let krypto = NodeId::derive(folder, EntryKind::Folder, "Krypto");
+    browser.toggle(krypto);
+    // Both ids at once: the nested one must not need splicing out on its own.
+    browser.remove(&[folder, krypto]);
+    assert!(!browser.nodes.contains_key(&folder), "gone from the tree");
+    assert!(
+        !browser.nodes.contains_key(&krypto),
+        "and so is everything below it"
+    );
+    let root = browser.node(NodeId::ROOT).expect("root");
+    assert!(
+        !root.children.contains(&folder),
+        "the root's listing lost the folder"
+    );
+    assert!(!browser.expanded.contains(&folder), "expansion pruned");
+    assert_eq!(
+        browser.current(),
+        NodeId::ROOT,
+        "the view fell back from the deleted directory"
+    );
+    assert_eq!(browser.path(), &[NodeId::ROOT], "and so did the breadcrumb");
+    assert!(
+        !browser.has_selection(),
+        "selections in the deleted subtree go with it"
+    );
+    browser.remove(&[NodeId::ROOT]);
+    assert!(
+        browser.nodes.contains_key(&NodeId::ROOT),
+        "the root scope cannot be deleted"
+    );
+}

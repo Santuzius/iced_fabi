@@ -1,0 +1,121 @@
+//! Navigation: entering folders (browse and tree), breadcrumbs, mode, and the queries about where the view stands.
+
+use super::{Browser, Node, NodeId, Outcome, node::EntryKind};
+use crate::browser::Mode;
+
+impl Browser {
+    pub fn mode(&self) -> Mode {
+        self.mode
+    }
+
+    /// Switches mode; entering tree mode keeps the current node expanded.
+    pub fn set_mode(&mut self, mode: Mode) {
+        self.mode = mode;
+        if mode == Mode::Tree {
+            self.expanded.insert(self.current);
+        }
+    }
+
+    /// The node whose children the browse mode shows.
+    pub fn current(&self) -> NodeId {
+        self.current
+    }
+
+    /// Breadcrumb from the root to the current node.
+    pub fn path(&self) -> &[NodeId] {
+        &self.path
+    }
+
+    pub fn node(&self, id: NodeId) -> Option<&Node> {
+        self.nodes.get(&id)
+    }
+
+    /// Node names from the root down to `id` — enough to rebuild the backend's path.
+    pub fn name_chain(&self, id: NodeId) -> Vec<&str> {
+        let mut chain = Vec::new();
+        let mut here = Some(id);
+        while let Some(node) = here.and_then(|id| self.nodes.get(&id)) {
+            chain.push(node.name.as_str());
+            here = node.parent;
+        }
+        chain.reverse();
+        chain
+    }
+
+    pub fn is_expanded(&self, id: NodeId) -> bool {
+        self.expanded.contains(&id)
+    }
+
+    /// A folder click (caret in tree mode): navigate in browse mode, expand or collapse in tree mode, and request the listing when the children are unknown.
+    pub fn activate(&mut self, id: NodeId) -> Outcome {
+        let Some(node) = self.nodes.get(&id).cloned() else {
+            return Outcome::None;
+        };
+        if node.kind == EntryKind::File {
+            return Outcome::FileActivated(id);
+        }
+        if self.mode == Mode::Tree {
+            let now_expanded = !self.expanded.contains(&id);
+            if now_expanded {
+                self.expanded.insert(id);
+            } else {
+                self.expanded.remove(&id);
+                return Outcome::None;
+            }
+            return self.request_load(id);
+        }
+        // Browse mode: jump to this directory.
+        self.current = id;
+        self.rebuild_path(id);
+        self.expanded.insert(id);
+        self.request_load(id)
+    }
+
+    /// Jump to an earlier breadcrumb node; only path ancestors can be jumped to.
+    pub fn goto(&mut self, id: NodeId) -> Outcome {
+        if let Some(position) = self.path.iter().position(|node| *node == id) {
+            self.path.truncate(position + 1);
+            self.current = id;
+            self.expanded.insert(id);
+            self.request_load(id)
+        } else {
+            Outcome::None
+        }
+    }
+
+    /// One breadcrumb step up.
+    pub fn up(&mut self) -> Outcome {
+        if self.path.len() > 1 {
+            self.path.pop();
+            self.current = *self.path.last().expect("path kept non-empty");
+            self.request_load(self.current)
+        } else {
+            Outcome::None
+        }
+    }
+
+    /// Click on a row's name in browse mode: folders navigate, files report activation. While the boxes are hidden ([`ViewOnly`](crate::SelectionUi::ViewOnly) always, [`LongPress`](crate::SelectionUi::LongPress) until armed) files only report activation — they are not ticked.
+    pub fn tap(&mut self, id: NodeId) -> Outcome {
+        let file = self
+            .nodes
+            .get(&id)
+            .is_some_and(|node| node.kind == EntryKind::File);
+        if file && self.mode == Mode::Browse && self.boxes_visible() {
+            // Material-style: without a separate open action a file tap selects it.
+            self.toggle(id);
+            return Outcome::None;
+        }
+        self.activate(id)
+    }
+
+    fn rebuild_path(&mut self, id: NodeId) {
+        let mut chain = vec![id];
+        let mut here = id;
+        while let Some(parent) = self.nodes.get(&here).and_then(|node| node.parent) {
+            chain.push(parent);
+            here = parent;
+        }
+        chain.reverse();
+        self.path = chain;
+    }
+}
