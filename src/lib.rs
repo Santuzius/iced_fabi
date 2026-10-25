@@ -419,7 +419,7 @@ where
         + iced_widget::core::Renderer
         + 'a,
 {
-    /// Add a toolbar button; the built-in mode switch stays on its right.
+    /// Add a toolbar button; the buttons land on the right of the bar, divided from the mode switch.
     pub fn tool(mut self, tool: impl Tool<Message> + 'a) -> Self {
         self.tools.push(ToolbarItem::Tool(Box::new(tool)));
         self
@@ -431,7 +431,7 @@ where
         self
     }
 
-    /// Show or hide the built-in browse/tree switch button.
+    /// Show or hide the built-in browse/tree switch button; it sits by the breadcrumbs, a divider from the tools. Default: on.
     pub fn show_mode_toggle(mut self, yes: bool) -> Self {
         self.mode_toggle = yes;
         self
@@ -443,7 +443,7 @@ where
         self
     }
 
-    /// The cabinet's one text button for the app's main action (download, share, delete, …): it is clickable while at least one entry is selected and otherwise grey like an inactive tool; `on_press` is sent on a click and what follows is the application's business. Where it sits: see [`action_placement`](Self::action_placement).
+    /// The cabinet's one text button for the app's main action (download, share, delete, …): it is clickable while at least one entry is selected and otherwise grey like an inactive tool; `on_press` is sent on a click and what follows is the application's business. It is a pill with completely round corners; where it sits: see [`action_placement`](Self::action_placement).
     pub fn action_button(mut self, text: impl Into<String>, on_press: Message) -> Self {
         self.action = Some(Action {
             text: text.into(),
@@ -622,19 +622,26 @@ where
         .style(self.flat(self.colour(field)))
     }
 
-    /// The action button as an element, styled like Syncative's `button_primary`: an accent-filled pill with the [`on_accent`](Style::on_accent) label and a same-colour 1-px border; hover swaps in [`accent_hover`](Style::accent_hover), and pressed is the base again. Without a selection it sits greyed like an inactive tool: the fill, label and border at 50 %, 45 % and 50 % alpha, and no click. `placement` sizes it: full-width under the list, content-sized and compact in the toolbar.
+    /// The action button as an element, styled like Syncative's `button_primary`: an accent-filled pill with the [`on_accent`](Style::on_accent) label and a same-colour 1-px border; hover swaps in [`accent_hover`](Style::accent_hover), and pressed is the base again. The corners are completely round (a radius of half the button's height). Without a selection it sits greyed like an inactive tool: the fill, label and border at 50 %, 45 % and 50 % alpha, and no click. `placement` sizes it: full-width and centred text under the list, content-sized and compact in the toolbar.
     fn action_button_element(
         &self,
         action: &Action<Message>,
         placement: ActionPlacement,
     ) -> Element<'a, Message, Theme, Renderer> {
-        let mut btn = button(self.label(action.text.clone())).padding(
-            if placement == ActionPlacement::ToolbarEnd {
-                [4.0, 6.0]
+        let content: Element<'a, Message, Theme, Renderer> =
+            if placement == ActionPlacement::WideCenter {
+                container(self.label(action.text.clone()))
+                    .width(Length::Fill)
+                    .center_x(Length::Fill)
+                    .into()
             } else {
-                [8.0, 18.0]
-            },
-        );
+                self.label(action.text.clone()).into()
+            };
+        let mut btn = button(content).padding(if placement == ActionPlacement::ToolbarEnd {
+            [4.0, 6.0]
+        } else {
+            [8.0, 18.0]
+        });
         if placement == ActionPlacement::WideCenter {
             btn = btn.width(Length::Fill);
         }
@@ -642,6 +649,7 @@ where
             btn = btn.on_press(action.on_press.clone());
         }
         let style = Rc::clone(&self.style);
+        let text_size = self.text_size.unwrap_or_default();
         btn.style(move |theme, status| {
             let appearance = style(theme);
             let ghost = status == button::Status::Disabled;
@@ -651,12 +659,14 @@ where
                 appearance.accent
             };
             let fade = |c: Color, a: f32| Color { a, ..c };
+            // Half the button's own height (text + vertical padding) makes the corners completely round.
+            let pill = (text_size.0 + 16.0) / 2.0;
             button::Style {
                 background: Some(Background::Color(fade(bg, if ghost { 0.5 } else { 1.0 }))),
                 text_color: fade(appearance.on_accent, if ghost { 0.45 } else { 1.0 }),
                 border: Border {
                     width: 1.0,
-                    radius: appearance.radius.into(),
+                    radius: pill.into(),
                     color: fade(bg, if ghost { 0.5 } else { 1.0 }),
                 },
                 ..button::Style::default()
@@ -689,7 +699,7 @@ where
 
     // --- chrome ---
 
-    /// Breadcrumbs on the left, the tool groups and the mode switch on the right.
+    /// Breadcrumbs with the mode switch behind a divider on the left, the tool groups on the right.
     fn toolbar(&self) -> Element<'a, Message, Theme, Renderer> {
         let mut crumbs = row![].spacing(2).align_y(Alignment::Center);
         // Tree mode is positionless (the rows are the position), so its breadcrumb stays at the root.
@@ -719,6 +729,7 @@ where
             );
         }
         let mut toolbar = row![].spacing(2).align_y(Alignment::Center);
+        // The mode switch belongs by the breadcrumb, divided from the tools; no divider when the bar has no tools at all.
         // A separator only ever divides two tools: leading, doubled-up and trailing ones fall away on their own, so a group whose tools were all left out takes its divider with them.
         let mut items: Vec<&ToolbarItem<'a, Message>> = Vec::new();
         for item in &self.tools {
@@ -756,38 +767,42 @@ where
         let has_tools = items
             .iter()
             .any(|item| matches!(item, ToolbarItem::Tool(_)));
-        // The toolbar variant of the action button lands after the tool groups, before the mode switch.
+        let mut mode_switch = row![].spacing(2).align_y(Alignment::Center);
+        if self.mode_toggle {
+            let mode_glyph = match self.browser.mode() {
+                Mode::Browse => icon::TREE,
+                Mode::Tree => icon::LIST,
+            };
+            mode_switch = mode_switch.push(
+                self.icon_button(mode_glyph, 18.0, 30.0, ColourField::Text)
+                    .on_press((self.on_event)(Event::ToggleMode)),
+            );
+            if has_tools {
+                mode_switch = mode_switch.push(self.divider());
+            }
+        }
+        // The toolbar variant of the action button lands after the tool groups.
         if let Some(action) = self
             .action
             .as_ref()
             .filter(|_| self.action_placement == ActionPlacement::ToolbarEnd)
         {
-            if has_tools {
+            if has_tools || self.mode_toggle {
                 toolbar = toolbar.push(self.divider());
             }
             toolbar = toolbar.push(self.action_button_element(action, ActionPlacement::ToolbarEnd));
         }
-        let action_end =
-            self.action_placement == ActionPlacement::ToolbarEnd && self.action.is_some();
-        if self.mode_toggle {
-            if has_tools || action_end {
-                toolbar = toolbar.push(self.divider());
-            }
-            let mode_glyph = match self.browser.mode() {
-                Mode::Browse => icon::TREE,
-                Mode::Tree => icon::LIST,
-            };
-            toolbar = toolbar.push(
-                self.icon_button(mode_glyph, 18.0, 30.0, ColourField::Text)
-                    .on_press((self.on_event)(Event::ToggleMode)),
-            );
-        }
-        row![crumbs, Space::new().width(Length::Fill), toolbar]
-            .spacing(8)
-            .height(Length::Fixed(BAR_HEIGHT))
-            .padding([0.0, EDGE])
-            .align_y(Alignment::Center)
-            .into()
+        row![
+            crumbs,
+            mode_switch,
+            Space::new().width(Length::Fill),
+            toolbar
+        ]
+        .spacing(8)
+        .height(Length::Fixed(BAR_HEIGHT))
+        .padding([0.0, EDGE])
+        .align_y(Alignment::Center)
+        .into()
     }
 
     /// The upright line between two tool groups.
