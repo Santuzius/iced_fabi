@@ -44,10 +44,12 @@ pub enum Separators {
 }
 
 impl Separators {
+    /// Whether row separator lines are drawn.
     pub fn horizontal(&self) -> bool {
         matches!(self, Self::Horizontal | Self::Both)
     }
 
+    /// Whether column separator lines are drawn.
     pub fn vertical(&self) -> bool {
         matches!(self, Self::Vertical | Self::Both)
     }
@@ -203,6 +205,7 @@ where
         self
     }
 
+    /// Assemble the frame. The same thing `.into()` does — pick whichever reads better in your chain.
     pub fn build(self) -> Element<'a, Message, Theme, Renderer> {
         let list = match self.browser.mode() {
             Mode::Browse => self.browse_list(),

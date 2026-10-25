@@ -3,6 +3,7 @@
 use super::{Browser, Checkboxes, Mode, Node, NodeId, Outcome, Selection, node::EntryKind};
 
 impl Browser {
+    /// Browse or tree, as it currently stands.
     pub fn mode(&self) -> Mode {
         self.mode
     }
@@ -33,6 +34,7 @@ impl Browser {
         &self.path
     }
 
+    /// The node behind an id, if the browser knows it (a deep id may not be listed yet).
     pub fn node(&self, id: NodeId) -> Option<&Node> {
         self.nodes.get(&id)
     }
@@ -55,6 +57,7 @@ impl Browser {
         all[1..].to_vec()
     }
 
+    /// Whether this folder's branch is open in tree mode.
     pub fn is_expanded(&self, id: NodeId) -> bool {
         self.expanded.contains(&id)
     }

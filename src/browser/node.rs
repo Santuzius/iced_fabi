@@ -39,7 +39,9 @@ impl NodeId {
 /// Whether a node is a directory (or a not-yet-listed branch that will turn out to have children) or a leaf.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum EntryKind {
+    /// A directory: navigable, and a selection unit that covers its content.
     Folder,
+    /// A leaf the app opens (or ticks).
     File,
 }
 
@@ -47,7 +49,9 @@ pub enum EntryKind {
 #[derive(Debug, Clone)]
 #[non_exhaustive]
 pub struct Entry {
+    /// Display name; also the identity ingredient ([`NodeId::derive`]).
     pub name: String,
+    /// Folder or file.
     pub kind: EntryKind,
     /// Size in bytes; `None` renders as an empty cell (and sorts as smallest).
     pub size: Option<u64>,
@@ -76,11 +80,15 @@ impl Entry {
         }
     }
 
+    /// Attach the byte count (folders usually leave it off).
+    #[must_use]
     pub fn size(mut self, bytes: u64) -> Self {
         self.size = Some(bytes);
         self
     }
 
+    /// Attach the modification time in seconds since the Unix epoch.
+    #[must_use]
     pub fn modified(mut self, seconds_since_epoch: i64) -> Self {
         self.modified = Some(seconds_since_epoch);
         self
@@ -93,8 +101,11 @@ impl Entry {
 pub struct Node {
     /// This node's identity, derived once at creation from the parent's id, kind and name — unlike a re-derivation, the root's id is [`NodeId::ROOT`] this way.
     pub id: NodeId,
+    /// Display name as listed.
     pub name: String,
+    /// Folder or file.
     pub kind: EntryKind,
+    /// The node this one hangs under; `None` only for the root.
     pub parent: Option<NodeId>,
     /// Children in listing order; the view sorts them per [`sort_by_column`](crate::Browser::sort_by_column).
     pub children: Vec<NodeId>,
@@ -104,7 +115,9 @@ pub struct Node {
     pub loading: bool,
     /// The last load of this node failed; a later [`Browser::activate`](crate::Browser::activate) retries.
     pub failed: bool,
+    /// Raw byte count from the listing; the [size column](crate::SizeColumn) renders it.
     pub size: Option<u64>,
+    /// Raw epoch seconds from the listing; the [modified column](crate::ModifiedColumn) renders it.
     pub modified: Option<i64>,
 }
 

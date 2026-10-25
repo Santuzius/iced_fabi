@@ -3,6 +3,7 @@
 use super::{Browser, Node, NodeId, Outcome, node::Entry};
 
 impl Browser {
+    /// Whether a load of this node is requested and unanswered.
     pub fn loading(&self, id: NodeId) -> bool {
         self.nodes.get(&id).is_some_and(|n| n.loading)
     }

@@ -18,10 +18,12 @@ pub(crate) struct Row {
 }
 
 impl Browser {
+    /// Whether folders sort before files regardless of the sort key. Default: true.
     pub fn folders_first(&self) -> bool {
         self.folders_first
     }
 
+    /// Turn folder-first ordering on or off.
     pub fn set_folders_first(&mut self, yes: bool) {
         self.folders_first = yes;
     }

@@ -199,6 +199,7 @@ impl Browser {
         self.columns.len() - 1
     }
 
+    /// The columns in display order: index 0 is the built-in Name column, then the [set](Self::set_columns) / [added](Self::add_column) ones.
     pub fn columns(&self) -> &[Box<dyn Column>] {
         &self.columns
     }

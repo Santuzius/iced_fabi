@@ -11,21 +11,31 @@ pub enum ColumnWidth {
     Fill,
     /// Share of the leftover width, relative to the other portioned columns.
     Portion(u16),
+    /// A fixed pixel width.
     Fixed(f32),
 }
 
 /// What one column shows for one node.
 #[derive(Debug, Clone)]
 pub enum Cell {
+    /// Nothing in this cell.
     Empty,
+    /// A text cell; `muted` renders it in the palette's muted colour (the default for the value columns).
     Text {
+        /// The text to show.
         text: String,
+        /// Render in the palette's muted colour.
         muted: bool,
     },
+    /// Just a glyph.
     Glyph(icondata::Icon),
+    /// A glyph followed by text.
     Both {
+        /// The leading glyph.
         glyph: icondata::Icon,
+        /// The text after the glyph.
         text: String,
+        /// Render the text in the palette's muted colour.
         muted: bool,
     },
 }
@@ -47,6 +57,7 @@ pub trait Column {
     /// Header label, clicked to sort by this column.
     fn header(&self) -> String;
 
+    /// How the column claims its share of the row width. Default: [`Portion(2)`](ColumnWidth::Portion).
     fn width(&self) -> ColumnWidth {
         ColumnWidth::Portion(2)
     }
@@ -73,6 +84,8 @@ impl Default for NameColumn {
 }
 
 impl NameColumn {
+    /// The built-in flexible, clickable Name column.
+    #[must_use]
     pub fn new() -> Self {
         Self { header: None }
     }
@@ -119,6 +132,8 @@ impl Default for ModifiedColumn {
 }
 
 impl ModifiedColumn {
+    /// The modification-time column, default header and renderer.
+    #[must_use]
     pub fn new() -> Self {
         Self {
             header: None,
@@ -171,6 +186,8 @@ impl Default for SizeColumn {
 }
 
 impl SizeColumn {
+    /// The size column, default header and renderer.
+    #[must_use]
     pub fn new() -> Self {
         Self {
             header: None,

@@ -4,10 +4,12 @@ use super::{Browser, Checkboxes, NodeId, Selection};
 use crate::Marker;
 
 impl Browser {
+    /// How many entries can be selected at once.
     pub fn selection(&self) -> Selection {
         self.selection
     }
 
+    /// How the selection boxes appear.
     pub fn checkboxes(&self) -> Checkboxes {
         self.checkboxes
     }
@@ -53,10 +55,12 @@ impl Browser {
         self.selected.iter().copied()
     }
 
+    /// Whether anything at all is selected.
     pub fn has_selection(&self) -> bool {
         !self.selected.is_empty()
     }
 
+    /// Untick everything (e.g. from the app's cancel button).
     pub fn clear_selection(&mut self) {
         self.selected.clear();
     }

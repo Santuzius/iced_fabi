@@ -1,3 +1,5 @@
+#![warn(missing_docs)]
+
 //! iced File cABInet — a widget for browsing directories and selecting items.
 //!
 //! Two views over one state ([`Browser`]):
