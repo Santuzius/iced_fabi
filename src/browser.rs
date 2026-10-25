@@ -108,6 +108,21 @@ pub enum SelectionMode {
     Single,
 }
 
+/// How selection can happen at all — the widget's mode.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum SelectionUi {
+    /// No selection at all: a pure file view. The boxes never appear and [`toggle`](Self::toggle) does nothing; tapping a file reports [`Outcome::FileActivated`] like in tree mode.
+    ViewOnly,
+    /// Selection, but the boxes are hidden until a row is pressed and held for at least [`LONG_PRESS`]: the hold arms the selection, the boxes appear on every row and the held row itself is ticked; this stays until the app calls [`disarm`](Self::disarm). While unarmed, taps keep their normal meaning (folders navigate, files report [`Outcome::FileActivated`]).
+    LongPress,
+    /// Normal: a box sits on every row and taps tick.
+    #[default]
+    Select,
+}
+
+/// How long a row must be held in [`SelectionUi::LongPress`] to reveal the boxes.
+pub const LONG_PRESS: std::time::Duration = std::time::Duration::from_millis(500);
+
 /// How a column asks for its share of the row width.
 #[derive(Debug, Clone, Copy)]
 pub enum ColumnWidth {
@@ -271,6 +286,12 @@ pub struct Browser {
     selected: HashSet<NodeId>,
     /// Whether the boxes accumulate or replace.
     selection_mode: SelectionMode,
+    /// Whether and how selection can happen at all.
+    selection_ui: SelectionUi,
+    /// Long-press bookkeeping: the row currently held and when the hold started.
+    held: Option<(NodeId, std::time::Instant)>,
+    /// Whether a long press has revealed the boxes ([`SelectionUi::LongPress`]).
+    armed: bool,
     /// Index into [`columns`](Self::columns); index 0 is the built-in [`NameColumn`].
     sort_column: usize,
     sort_ascending: bool,
@@ -308,6 +329,9 @@ impl Browser {
             expanded: HashSet::from([NodeId::ROOT]),
             selected: HashSet::new(),
             selection_mode: SelectionMode::Multiple,
+            selection_ui: SelectionUi::Select,
+            held: None,
+            armed: false,
             sort_column: 0,
             sort_ascending: true,
             folders_first: true,
@@ -372,6 +396,71 @@ impl Browser {
 
     pub fn selection_mode(&self) -> SelectionMode {
         self.selection_mode
+    }
+
+    pub fn selection_ui(&self) -> SelectionUi {
+        self.selection_ui
+    }
+
+    /// Set the widget mode; switching to [`SelectionUi::ViewOnly`] drops any existing selection, and switching modes always re-hides a revealed long-press box column. Default: [`SelectionUi::Select`].
+    pub fn set_selection_ui(&mut self, ui: SelectionUi) {
+        self.selection_ui = ui;
+        self.held = None;
+        self.armed = false;
+        if ui == SelectionUi::ViewOnly {
+            self.selected.clear();
+        }
+    }
+
+    /// Whether the selection boxes should be drawn right now (the [`Cabinet::checkboxes`] column setting aside): always in [`SelectionUi::Select`], only after a revealing long press in [`SelectionUi::LongPress`], never in [`SelectionUi::ViewOnly`].
+    pub fn boxes_visible(&self) -> bool {
+        match self.selection_ui {
+            SelectionUi::ViewOnly => false,
+            SelectionUi::LongPress => self.armed,
+            SelectionUi::Select => true,
+        }
+    }
+
+    /// Whether a revealing long press has armed the boxes.
+    pub fn is_armed(&self) -> bool {
+        self.armed
+    }
+
+    /// Hide the boxes revealed by a long press again (e.g. from a back or cancel action).
+    pub fn disarm(&mut self) {
+        self.armed = false;
+        self.held = None;
+    }
+
+    /// A row's press began ([`SelectionUi::LongPress`] wiring): remember which row and when.
+    pub fn hold_started(&mut self, id: NodeId) {
+        self.held = Some((id, std::time::Instant::now()));
+    }
+
+    /// A row's press ended: true if the same row was held at least [`LONG_PRESS`] — the boxes appear and the held row itself becomes the selection. On false the press was short: the app should now apply the row's normal [`tap`](Self::tap) — while the boxes are hidden the widget's press layer replaces the row button's own events, so the tap only arrives through this path.
+    pub fn hold_ended(&mut self, id: NodeId) -> bool {
+        let held = self
+            .held
+            .take()
+            .filter(|(held_id, _)| *held_id == id)
+            .map(|(held_id, at)| (held_id, at.elapsed()));
+        self.hold_ended_after(held)
+    }
+
+    /// The clock-free core of [`hold_ended`](Self::hold_ended): arm when the hold lasted long enough and tick the held row with it.
+    fn hold_ended_after(&mut self, held: Option<(NodeId, std::time::Duration)>) -> bool {
+        self.held = None;
+        let armed = held.is_some_and(|(_, held)| held >= LONG_PRESS);
+        if armed {
+            self.armed = true;
+            if let Some((id, _)) = held
+                && self.marker(id) != Marker::Selected
+            {
+                // Material-style: the row you held long enough to reveal the boxes is already chosen.
+                self.toggle(id);
+            }
+        }
+        armed
     }
 
     /// `Single` makes every box replace the selection: at most one entry is ever ticked; the header's select-all then ticks the scope itself as that one unit, and unticking a covered entry clears the whole (only) selection.
@@ -711,7 +800,7 @@ impl Browser {
 
     /// A folder click (caret in tree mode): navigate in browse mode, expand or collapse in tree mode, and request the listing when the children are unknown.
     pub fn activate(&mut self, id: NodeId) -> Outcome {
-        let Some(node) = self.nodes.get(&id) else {
+        let Some(node) = self.nodes.get(&id).cloned() else {
             return Outcome::None;
         };
         if node.kind == EntryKind::File {
@@ -757,13 +846,13 @@ impl Browser {
         }
     }
 
-    /// Click on a row's name in browse mode: folders navigate, files report activation.
+    /// Click on a row's name in browse mode: folders navigate, files report activation. While the boxes are hidden ([`SelectionUi::ViewOnly`] always, [`SelectionUi::LongPress`] until armed) files only report activation — they are not ticked.
     pub fn tap(&mut self, id: NodeId) -> Outcome {
         let file = self
             .nodes
             .get(&id)
             .is_some_and(|node| node.kind == EntryKind::File);
-        if file && self.mode == Mode::Browse {
+        if file && self.mode == Mode::Browse && self.boxes_visible() {
             // Material-style: without a separate open action a file tap selects it.
             self.toggle(id);
             return Outcome::None;
@@ -771,11 +860,11 @@ impl Browser {
         self.activate(id)
     }
 
-    /// Toggle the unit selection of a node.
+    /// Toggle the unit selection of a node. In [`SelectionUi::ViewOnly`] this does nothing.
     ///
     /// Rules (Material-inspired): a node under a selected ancestor shows a tick because the ancestor's unit covers it, and clicking its box removes just that entry from the selection (see [`uncheck_below`](Self::uncheck_below)) — the sibling rows stay ticked and the ancestors become dots; selecting a folder that had explicit selections below clears them, because the folder now stands for its whole subtree. In [`SelectionMode::Single`] any tap first clears everything: tapping the (possibly covered) entry that reads ticked leaves nothing selected, tapping another makes it the one selection.
     pub fn toggle(&mut self, id: NodeId) {
-        if !self.nodes.contains_key(&id) {
+        if self.selection_ui == SelectionUi::ViewOnly || !self.nodes.contains_key(&id) {
             return;
         }
         if self.selection_mode == SelectionMode::Single {
@@ -1532,6 +1621,66 @@ mod tests {
         assert_eq!(names(&browser.tree_rows()), vec!["My files", "Finanzen"]);
         browser.set_folders_only(false);
         assert_eq!(browser.browse_rows().len(), 2, "the file comes back");
+    }
+
+    #[test]
+    fn long_press_reveals_boxes_and_short_presses_do_not() {
+        let mut browser = sample();
+        browser.set_selection_ui(SelectionUi::LongPress);
+        let notes = NodeId::derive(NodeId::ROOT, EntryKind::File, "notes.txt");
+        assert!(!browser.boxes_visible(), "unarmed: no boxes");
+        browser.hold_started(notes);
+        assert!(
+            !browser.hold_ended_after(Some((notes, std::time::Duration::from_millis(100)))),
+            "a short press stays unarmed"
+        );
+        assert!(!browser.boxes_visible());
+        browser.hold_started(notes);
+        assert!(
+            browser.hold_ended_after(Some((notes, LONG_PRESS))),
+            "a hold of exactly LONG_PRESS arms"
+        );
+        assert!(browser.boxes_visible());
+        assert!(
+            browser.selected().any(|id| id == notes),
+            "the held row comes ticked with the boxes"
+        );
+        // With the boxes revealed, ticking works as usual until the app disarms again.
+        let folder = NodeId::derive(NodeId::ROOT, EntryKind::Folder, "Finanzen");
+        browser.toggle(folder);
+        assert!(browser.selected().any(|id| id == folder));
+        browser.disarm();
+        assert!(!browser.boxes_visible());
+        // Releasing a different row than the one pressed arms nothing.
+        browser.hold_started(notes);
+        assert!(!browser.hold_ended(folder));
+    }
+
+    #[test]
+    fn view_only_mode_never_selects() {
+        let mut browser = sample();
+        let notes = NodeId::derive(NodeId::ROOT, EntryKind::File, "notes.txt");
+        browser.set_selection_ui(SelectionUi::ViewOnly);
+        browser.toggle(notes);
+        assert!(
+            !browser.has_selection(),
+            "toggles are ignored in the pure view"
+        );
+        assert_eq!(
+            browser.tap(notes),
+            Outcome::FileActivated(notes),
+            "files just report"
+        );
+        assert_eq!(browser.activate(notes), Outcome::FileActivated(notes));
+        // Existing selections are dropped on the way in, and selection comes back on the way out.
+        browser.set_selection_ui(SelectionUi::Select);
+        browser.toggle(notes);
+        assert!(browser.has_selection());
+        browser.set_selection_ui(SelectionUi::ViewOnly);
+        assert!(
+            !browser.has_selection(),
+            "and switching into the view drops it"
+        );
     }
 
     #[test]

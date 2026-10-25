@@ -24,9 +24,9 @@ mod cut;
 mod icon;
 
 pub use browser::{
-    Browser, Cell, Column, ColumnWidth, Entry, EntryKind, FormatModified, FormatSize, Marker, Mode,
-    ModifiedColumn, NameColumn, Node, NodeId, Outcome, SelectionMode, SizeColumn, format_bytes,
-    format_epoch,
+    Browser, Cell, Column, ColumnWidth, Entry, EntryKind, FormatModified, FormatSize, LONG_PRESS,
+    Marker, Mode, ModifiedColumn, NameColumn, Node, NodeId, Outcome, SelectionMode, SelectionUi,
+    SizeColumn, format_bytes, format_epoch,
 };
 
 use std::fmt;
@@ -48,6 +48,10 @@ pub enum Event {
     Activate(NodeId),
     /// Selection marker clicked; see [`Browser::toggle`].
     Toggle(NodeId),
+    /// A row's press began — only emitted in [`SelectionUi::LongPress`] while the boxes are hidden; feed it to [`Browser::hold_started`].
+    HoldStarted(NodeId),
+    /// A row's press ended — feed it to [`Browser::hold_ended`], which reveals the boxes and ticks the held row when the row was held long enough.
+    HoldEnded(NodeId),
     /// The header's select-all box clicked; see [`Browser::toggle_all`].
     ToggleAll,
     /// Breadcrumb clicked.
@@ -679,7 +683,7 @@ where
             .height(Length::Fixed(ROW_HEIGHT))
             .padding([0.0, EDGE])
             .align_y(Alignment::Center);
-        if self.checkboxes {
+        if self.boxes_shown() {
             row = row.push(container(marker).center_x(Length::Fixed(MARKER_CELL)));
         }
         row = row.push(cell(name, columns[0].width()));
@@ -692,10 +696,15 @@ where
         row.into()
     }
 
+    /// Whether a selection box column goes on the rows and the header right now: the [`Cabinet::checkboxes`] column setting and the browser's [`SelectionUi`] (which in [`SelectionUi::LongPress`] flips on once a row has been held long enough) both have to allow it.
+    fn boxes_shown(&self) -> bool {
+        self.checkboxes && self.browser.boxes_visible()
+    }
+
     /// The select-all box and the sort headers — or, while something is selected, the selection count.
     fn column_header(&self) -> Element<'a, Message, Theme, Renderer> {
         let marker = self
-            .checkboxes
+            .boxes_shown()
             .then(|| self.marker_button(self.browser.scope_marker(), Event::ToggleAll));
         let tree = self.browser.mode() == Mode::Tree;
         let content = if self.browser.has_selection() {
@@ -876,7 +885,7 @@ where
         };
         row![
             Space::new().width(Length::Fixed(
-                (if self.checkboxes { MARKER_CELL } else { 0.0 }) + CELL_PAD + indent,
+                (if self.boxes_shown() { MARKER_CELL } else { 0.0 }) + CELL_PAD + indent,
             )),
             content
         ]
@@ -935,7 +944,7 @@ where
         );
         let selected = row.marker == Marker::Selected;
         let style = Rc::clone(&self.style);
-        button(content)
+        let line: Element<'a, Message, Theme, Renderer> = button(content)
             .width(Length::Fill)
             .padding(0)
             .style(move |theme, status| {
@@ -956,7 +965,24 @@ where
                 }
             })
             .on_press((self.on_event)(Event::Activate(row.id)))
+            .into();
+        if self.checkboxes
+            && self.browser.selection_ui() == SelectionUi::LongPress
+            && !self.browser.is_armed()
+        {
+            // While the boxes are hidden, a transparent layer on top of the row records press and release.
+            // Stack children are handled top-down, so `HoldEnded` reaches the app before the row's own
+            // activation — and `Browser::hold_ended` then swallows that activation for a revealing hold.
+            iced_widget::stack![
+                line,
+                iced_widget::MouseArea::new(Space::new().width(Length::Fill).height(Length::Fill))
+                    .on_press((self.on_event)(Event::HoldStarted(row.id)))
+                    .on_release((self.on_event)(Event::HoldEnded(row.id)))
+            ]
             .into()
+        } else {
+            line
+        }
     }
 
     fn cell_content(&self, cell: Cell) -> Element<'a, Message, Theme, Renderer> {

@@ -1,8 +1,8 @@
 //! A cloud directory browser without the cloud: the listings come from a fake backend that answers every request one tick late, so the `activate → NeedsLoad → set_children` round-trip and its loading states behave like a real network drive.
 //!
-//! The bar above the cabinet demos the configuration hooks with dropdowns: the [`iced::Theme`] (including a reproduction of Syncative's palette and [`iced_fabi::Style`]), the file/folder [`iced_fabi::RowIcons`] (Tabler, or the vendored multicolour Material Icon Theme), the [`iced_fabi::Separators`] grid, the zebra stripe behind every second row, the checkbox column, and what happens to toolbar tools that are not currently applicable (greyed out, or hidden outright). The toolbar itself shows the [`iced_fabi::Tool`] API (copy, paste, delete — in two groups divided by [`iced_fabi::Cabinet::tool_separator`], enabled per state, and copy/paste carries whole folder subtrees); selecting is done purely through the checkboxes. The column list gets one custom [`TypeColumn`].
+//! The bar above the cabinet demos the configuration hooks with dropdowns: the [`iced::Theme`] (including a reproduction of Syncative's palette and [`iced_fabi::Style`]), the file/folder [`iced_fabi::RowIcons`] (Tabler, or the vendored multicolour Material Icon Theme), the [`iced_fabi::Separators`] grid, the zebra stripe behind every second row, the checkbox column, which entries are listed (all or folders only — file kinds are filtered code-side at init), whether the selection holds one entry or many, and how the boxes can be summoned at all (always, on long press, or never); also what happens to toolbar tools that are not currently applicable (greyed out, or hidden outright). The toolbar itself shows the [`iced_fabi::Tool`] API (copy, paste, delete — in two groups divided by [`iced_fabi::Cabinet::tool_separator`], enabled per state, and copy/paste carries whole folder subtrees); selecting is done purely through the checkboxes. The column list gets one custom [`TypeColumn`].
 //!
-//! Run: `cargo run --example cloud_browse` — then switch modes with the icon in the top right, tap folders to drill down, tap the boxes to select, and watch the parent markers turn into dots.
+//! Run: `cargo run --example cloud_browse` — then switch modes with the icon in the top right, tap folders to drill down, tap the boxes to select (press and hold a row first when "Ticking" is on *hold*), and watch the parent markers turn into dots.
 
 use std::{collections::HashMap, fmt, sync::LazyLock, time::Duration};
 
@@ -19,7 +19,7 @@ fn main() -> iced::Result {
         // Syncative's UI font; the default themes show it too, since iced fixes the font for the whole run.
         .default_font(SYNCATIVE_FONT)
         // Wide enough for the whole configuration bar.
-        .window_size((1920.0, 760.0))
+        .window_size((1300.0, 760.0))
         .run()
 }
 
@@ -37,6 +37,7 @@ enum Message {
     Checkboxes(CheckboxChoice),
     Entries(EntryChoice),
     Selection(SelectionChoice),
+    Ticking(TickingChoice),
     Tick,
 }
 
@@ -160,6 +161,30 @@ impl fmt::Display for SelectionChoice {
 }
 
 const SELECTION_CHOICES: &[SelectionChoice] = &[SelectionChoice::Multiple, SelectionChoice::Single];
+
+/// Whether and how the widget lets you tick entries at all.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum TickingChoice {
+    Never,
+    Hold,
+    Tap,
+}
+
+impl fmt::Display for TickingChoice {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(match self {
+            Self::Never => "never",
+            Self::Hold => "hold",
+            Self::Tap => "tap",
+        })
+    }
+}
+
+const TICKING_CHOICES: &[TickingChoice] = &[
+    TickingChoice::Never,
+    TickingChoice::Hold,
+    TickingChoice::Tap,
+];
 
 const LINES: &[iced_fabi::Separators] = &[
     iced_fabi::Separators::None,
@@ -611,6 +636,7 @@ struct App {
     checkboxes: CheckboxChoice,
     entries: EntryChoice,
     selection: SelectionChoice,
+    ticking: TickingChoice,
 }
 
 impl App {
@@ -634,6 +660,7 @@ impl App {
             checkboxes: CheckboxChoice::On,
             entries: EntryChoice::All,
             selection: SelectionChoice::Multiple,
+            ticking: TickingChoice::Tap,
         };
         let task = Task::done(app.accept(outcome));
         (app, task)
@@ -649,6 +676,20 @@ impl App {
                 Event::Toggle(id) => {
                     self.browser.toggle(id);
                     Task::none()
+                }
+                Event::HoldStarted(id) => {
+                    self.browser.hold_started(id);
+                    Task::none()
+                }
+                Event::HoldEnded(id) => {
+                    // While the boxes are hidden the press layer swallows the row button's own
+                    // events: a short press has to be applied here as the row's normal tap.
+                    if self.browser.hold_ended(id) {
+                        Task::none()
+                    } else {
+                        let outcome = self.browser.tap(id);
+                        Task::done(self.accept(outcome))
+                    }
                 }
                 Event::ToggleAll => {
                     self.browser.toggle_all();
@@ -685,6 +726,15 @@ impl App {
                 self.browser.set_selection_mode(match choice {
                     SelectionChoice::Multiple => iced_fabi::SelectionMode::Multiple,
                     SelectionChoice::Single => iced_fabi::SelectionMode::Single,
+                });
+                Task::none()
+            }
+            Message::Ticking(choice) => {
+                self.ticking = choice;
+                self.browser.set_selection_ui(match choice {
+                    TickingChoice::Never => iced_fabi::SelectionUi::ViewOnly,
+                    TickingChoice::Hold => iced_fabi::SelectionUi::LongPress,
+                    TickingChoice::Tap => iced_fabi::SelectionUi::Select,
                 });
                 Task::none()
             }
@@ -853,52 +903,66 @@ impl App {
                 list.into()
             }
         }
-        let bar = iced::widget::row![
+        let bar = iced::widget::column![
             iced::widget::text(title).size(if syncative { 24 } else { 20 }),
-            iced::widget::Space::new().width(Length::Fill),
-            label("Theme"),
-            dropdown(THEMES, &self.theme, Message::Theme, 150.0, syncative),
-            label("Icons"),
-            dropdown(ICON_CHOICES, &self.icons, Message::Icons, 190.0, syncative),
-            label("Inactive tools"),
-            dropdown(
-                INACTIVE_CHOICES,
-                &self.inactive,
-                Message::Inactive,
-                130.0,
-                syncative
-            ),
-            label("Lines"),
-            dropdown(LINES, &self.lines, Message::Lines, 120.0, syncative),
-            label("Zebra"),
-            dropdown(ZEBRA, &self.zebra, Message::Zebra, 100.0, syncative),
-            label("Checkboxes"),
-            dropdown(
-                CHECKBOX_CHOICES,
-                &self.checkboxes,
-                Message::Checkboxes,
-                90.0,
-                syncative
-            ),
-            label("Entries"),
-            dropdown(
-                ENTRY_CHOICES,
-                &self.entries,
-                Message::Entries,
-                140.0,
-                syncative
-            ),
-            label("Selection"),
-            dropdown(
-                SELECTION_CHOICES,
-                &self.selection,
-                Message::Selection,
-                110.0,
-                syncative
-            ),
+            iced::widget::row![
+                label("Theme"),
+                dropdown(THEMES, &self.theme, Message::Theme, 150.0, syncative),
+                label("Icons"),
+                dropdown(ICON_CHOICES, &self.icons, Message::Icons, 190.0, syncative),
+                label("Inactive tools"),
+                dropdown(
+                    INACTIVE_CHOICES,
+                    &self.inactive,
+                    Message::Inactive,
+                    130.0,
+                    syncative
+                ),
+                label("Lines"),
+                dropdown(LINES, &self.lines, Message::Lines, 120.0, syncative),
+            ]
+            .spacing(8)
+            .align_y(iced::Alignment::Center),
+            iced::widget::row![
+                label("Zebra"),
+                dropdown(ZEBRA, &self.zebra, Message::Zebra, 100.0, syncative),
+                label("Checkboxes"),
+                dropdown(
+                    CHECKBOX_CHOICES,
+                    &self.checkboxes,
+                    Message::Checkboxes,
+                    90.0,
+                    syncative
+                ),
+                label("Entries"),
+                dropdown(
+                    ENTRY_CHOICES,
+                    &self.entries,
+                    Message::Entries,
+                    140.0,
+                    syncative
+                ),
+                label("Selection"),
+                dropdown(
+                    SELECTION_CHOICES,
+                    &self.selection,
+                    Message::Selection,
+                    110.0,
+                    syncative
+                ),
+                label("Ticking"),
+                dropdown(
+                    TICKING_CHOICES,
+                    &self.ticking,
+                    Message::Ticking,
+                    100.0,
+                    syncative
+                ),
+            ]
+            .spacing(8)
+            .align_y(iced::Alignment::Center),
         ]
-        .spacing(8)
-        .align_y(iced::Alignment::Center);
+        .spacing(8);
         // Tool state is snapshotted into the `when` closures: the toolbar rebuilds every frame.
         let has_selection = self.browser.has_selection();
         let has_clipboard = !self.clipboard.is_empty();
