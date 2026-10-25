@@ -665,7 +665,7 @@ impl Browser {
 
     /// Toggle the unit selection of a node.
     ///
-    /// Rules (Material-inspired): a node under a selected ancestor cannot be selected separately (tapping it deselects the ancestor instead, matching the visible rows' meaning); selecting a folder that had explicit selections below clears them, because the folder now stands for its whole subtree.
+    /// Rules (Material-inspired): a node under a selected ancestor shows a tick because the ancestor's unit covers it, and clicking its box removes just that entry from the selection (see [`uncheck_below`](Self::uncheck_below)) — the sibling rows stay ticked and the ancestors become dots; selecting a folder that had explicit selections below clears them, because the folder now stands for its whole subtree.
     pub fn toggle(&mut self, id: NodeId) {
         if !self.nodes.contains_key(&id) {
             return;
@@ -675,7 +675,7 @@ impl Browser {
             return;
         }
         if let Some(ancestor) = self.selected_ancestor(id) {
-            self.selected.remove(&ancestor);
+            self.uncheck_below(ancestor, id);
             return;
         }
         self.selected.insert(id);
@@ -687,6 +687,33 @@ impl Browser {
             .collect();
         for other in clear {
             self.selected.remove(&other);
+        }
+    }
+
+    /// Unticks one covered entry while the rest of the selected `ancestor`'s subtree stays selected: the unit is dissolved along the chain from the ancestor down to `id`, re-entering every listed child as an explicit unit except the one the chain leads through. That loses nothing: `id` shows on screen, so every folder on the chain is expanded and listed, and the re-entered siblings cover their unloaded subtrees themselves. The chain's folders end up Partial, `id` itself Unselected.
+    fn uncheck_below(&mut self, ancestor: NodeId, id: NodeId) {
+        self.selected.remove(&ancestor);
+        let mut chain: Vec<NodeId> = Vec::new();
+        let mut here = id;
+        while here != ancestor {
+            chain.push(here);
+            match self.nodes.get(&here).and_then(|node| node.parent) {
+                Some(parent) => here = parent,
+                None => break,
+            }
+        }
+        let mut level = ancestor;
+        for step in chain.iter().rev() {
+            let siblings = match self.nodes.get(&level) {
+                Some(node) => node.children.clone(),
+                None => break,
+            };
+            for sibling in siblings {
+                if sibling != *step {
+                    self.selected.insert(sibling);
+                }
+            }
+            level = *step;
         }
     }
 
@@ -985,19 +1012,6 @@ mod tests {
     }
 
     #[test]
-    fn toggle_folder_under_selected_deselects_ancestor() {
-        let mut browser = sample();
-        browser.toggle(NodeId::ROOT);
-        assert_eq!(browser.marker(NodeId::ROOT), Marker::Selected);
-        let file = NodeId::derive(NodeId::ROOT, EntryKind::File, "notes.txt");
-        browser.toggle(file);
-        assert!(
-            !browser.has_selection(),
-            "tapping under a checked root unchecks it"
-        );
-    }
-
-    #[test]
     fn selected_folder_ticks_its_loaded_children() {
         let mut browser = sample();
         let folder = NodeId::derive(NodeId::ROOT, EntryKind::Folder, "Finanzen");
@@ -1025,9 +1039,14 @@ mod tests {
         browser.toggle(child);
         assert!(
             !browser.has_selection(),
-            "tapping a covered row unticks the folder"
+            "tapping the only covered row leaves nothing ticked"
         );
         assert_eq!(browser.marker(child), Marker::Unselected);
+        assert_eq!(
+            browser.marker(folder),
+            Marker::Unselected,
+            "no dot left without selected children"
+        );
     }
 
     #[test]
@@ -1061,6 +1080,111 @@ mod tests {
             !browser.has_selection(),
             "the box unticks the covering ancestor"
         );
+    }
+
+    #[test]
+    fn unchecking_a_covered_row_keeps_the_rest_of_the_unit() {
+        let mut browser = sample();
+        browser.toggle(NodeId::ROOT);
+        let file = NodeId::derive(NodeId::ROOT, EntryKind::File, "notes.txt");
+        let folder = NodeId::derive(NodeId::ROOT, EntryKind::Folder, "Finanzen");
+        browser.toggle(file);
+        assert_eq!(
+            browser.marker(file),
+            Marker::Unselected,
+            "the tapped box unticks itself"
+        );
+        assert_eq!(
+            browser.marker(folder),
+            Marker::Selected,
+            "the sibling stays ticked"
+        );
+        assert_eq!(
+            browser.marker(NodeId::ROOT),
+            Marker::Partial,
+            "the ancestor becomes a dot"
+        );
+        assert_eq!(browser.selected().collect::<Vec<_>>(), vec![folder]);
+        browser.toggle(NodeId::ROOT);
+        assert_eq!(
+            browser.selected().collect::<Vec<_>>(),
+            vec![NodeId::ROOT],
+            "rechecking the ancestor collapses the dissolved unit back into one"
+        );
+        assert_eq!(
+            browser.marker(file),
+            Marker::Selected,
+            "covered by the root again"
+        );
+    }
+
+    #[test]
+    fn unchecking_deep_below_a_selected_folder_dissolves_along_the_chain() {
+        let mut browser = sample();
+        let folder = NodeId::derive(NodeId::ROOT, EntryKind::Folder, "Finanzen");
+        browser.set_children(
+            folder,
+            vec![
+                Entry {
+                    name: "Depot".into(),
+                    kind: EntryKind::Folder,
+                    size: None,
+                    modified: None,
+                },
+                Entry {
+                    name: "beleg.pdf".into(),
+                    kind: EntryKind::File,
+                    size: None,
+                    modified: None,
+                },
+            ],
+        );
+        let depot = NodeId::derive(folder, EntryKind::Folder, "Depot");
+        browser.set_children(
+            depot,
+            vec![
+                Entry {
+                    name: "keys.txt".into(),
+                    kind: EntryKind::File,
+                    size: None,
+                    modified: None,
+                },
+                Entry {
+                    name: "pub.txt".into(),
+                    kind: EntryKind::File,
+                    size: None,
+                    modified: None,
+                },
+            ],
+        );
+        let keys = NodeId::derive(depot, EntryKind::File, "keys.txt");
+        let public = NodeId::derive(depot, EntryKind::File, "pub.txt");
+        browser.toggle(folder);
+        assert_eq!(
+            browser.marker(keys),
+            Marker::Selected,
+            "covered from two levels up"
+        );
+        browser.toggle(keys);
+        assert_eq!(browser.marker(keys), Marker::Unselected);
+        assert_eq!(
+            browser.marker(public),
+            Marker::Selected,
+            "the sibling inside the same folder stays ticked"
+        );
+        assert_eq!(
+            browser.marker(depot),
+            Marker::Partial,
+            "the chain's folder becomes a dot"
+        );
+        assert_eq!(browser.marker(folder), Marker::Partial);
+        let mut units: Vec<NodeId> = browser.selected().collect();
+        units.sort();
+        assert_eq!(units, {
+            let mut expected = vec![NodeId::derive(folder, EntryKind::File, "beleg.pdf"), public];
+            expected.sort();
+            expected
+        });
     }
 
     #[test]
