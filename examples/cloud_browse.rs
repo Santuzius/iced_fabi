@@ -1182,16 +1182,25 @@ fn write_copy(cloud: &mut HashMap<String, Vec<Entry>>, parent: &str, copied: &Co
     }
 }
 
-/// Drop the listing at `path` and every listing below it (a delete in a real backend takes the whole subtree with the entry).
+/// Drop the listing at `path` and every listing below it (a delete in a real backend takes the whole subtree with the entry), and — like a real backend — remove the entry itself from its parent's listing, so the refresh after the delete does not bring it straight back.
 fn delete_paths(cloud: &mut HashMap<String, Vec<Entry>>, path: &str) {
     let prefix = format!("{path}/");
     let below: Vec<String> = cloud
         .keys()
-        .filter(|key| *key == path || key.starts_with(&prefix))
+        .filter(|key| key.starts_with(&prefix))
         .cloned()
         .collect();
     for key in below {
         cloud.remove(&key);
+    }
+    match path.rsplit_once('/') {
+        // A top-level path is the root scope: it itself stays (the browser refuses to delete it), only its subtree keys go.
+        None => {}
+        Some((parent, name)) => {
+            if let Some(listing) = cloud.get_mut(parent) {
+                listing.retain(|entry| entry.name != name);
+            }
+        }
     }
 }
 
