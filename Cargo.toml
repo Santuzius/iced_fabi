@@ -1,0 +1,23 @@
+[package]
+name = "iced_fabi"
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+authors = ["Alexander Menzel <menzel.alexander@proton.me>"]
+description = "iced File cABInet: An iced GUI widget for browsing directories and sorting or selecting items."
+repository = "https://github.com/Santuzius/iced_fabi"
+readme = "README.md"
+keywords = ["iced", "widget", "file", "browser", "tree"]
+categories = ["gui"]
+
+[dependencies]
+# Only the widgets, so the crate brings no renderer, window system or executor of its own. Apps on an iced fork patch `iced_widget` with the fork's (their `[patch.crates-io]`), so Cargo builds a single copy of iced. The icons are SVG documents, hence the `svg` feature.
+iced_widget = { version = "0.14", features = ["svg"] }
+# Status glyphs (markers, carets, file kinds, sort arrows) from one pack; syncative uses the same crate and pack, so the glyphs match its UI.
+icondata = { version = "0.7", default-features = false, features = ["tabler-icons"] }
+# Direct handle on the `IconData` struct to stitch the partial-selection marker (box + dot) from Tabler parts; already a transitive dep of `icondata`, so this adds nothing new to the build.
+icondata_core = "0.1"
+
+[dev-dependencies]
+# The examples are real apps; they pull the windowing and the executor (the same runtime syncative uses, for `iced::time::every`).
+iced = { version = "0.14", features = ["svg", "tokio"] }

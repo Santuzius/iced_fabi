@@ -1,0 +1,10 @@
+iced_fabi
+Copyright (C) 2026 Alexander Menzel <menzel.alexander@proton.me>
+
+This program is free software: you can redistribute it and/or modify it under the terms of the MIT license; see the LICENSE file for the full text.
+
+This program incorporates third-party artwork:
+
+  * examples/assets/material-icon-theme/: SVG icons from the Material Icon Theme for VS Code (MIT, © 2025 Material Extensions, https://github.com/material-extensions/vscode-material-icon-theme), taken unmodified from release v5.39.0 — most from its icons/ at that tag, the three default glyphs (file, folder, folder-open) from the same release's npm package; the license text is examples/assets/material-icon-theme/LICENSE.
+
+  * src/icon.rs embeds one square outline path verbatim from Tabler Icons (MIT, © 2022-present the Tabler contributors, https://tabler.io/icons, glyph TbSquareOutline) for the partial-selection marker; all other Tabler glyphs (the default icon set) arrive via the icondata crate and are not copied into this repository.
