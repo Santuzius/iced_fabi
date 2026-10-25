@@ -65,7 +65,7 @@ where
                 button(label)
                     .padding([4, 6])
                     .style(self.flat(self.colour(field)))
-                    .on_press((self.on_event)(crate::Event::GoTo(*id))),
+                    .on_press((self.on_event)(crate::Event::CrumbPressed(*id))),
             );
         }
         let mut toolbar = row![].spacing(2).align_y(Alignment::Center);
@@ -101,7 +101,7 @@ where
             };
             mode_switch = mode_switch.push(
                 self.icon_button(mode_glyph, 18.0, 30.0, ColourField::Text)
-                    .on_press((self.on_event)(crate::Event::ToggleMode)),
+                    .on_press((self.on_event)(crate::Event::ModeSwitchPressed)),
             );
             if has_tools {
                 mode_switch = mode_switch.push(self.divider());

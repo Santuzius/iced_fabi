@@ -5,3 +5,4 @@ mod long_press;
 mod navigation;
 mod rows;
 mod selection;
+mod update;

@@ -21,18 +21,22 @@ use std::collections::{HashMap, HashSet};
 
 use crate::{
     column::{Column, ModifiedColumn, NameColumn, SizeColumn},
+    event::Event,
     format::{format_bytes, format_epoch},
 };
 
 /// The consequence of a [`Browser`] action, telling the application what it must do next.
+#[must_use = "the outcome says what the application must do next"]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Outcome {
-    /// Nothing happened (or a toggle/selection-only event that the calling code already accounted for).
+    /// Nothing happened (or a change the calling code already accounts for, e.g. a re-render).
     None,
     /// The app should list this node's children now; [`loading`](Browser::loading) is set until [`set_children`](Browser::set_children) or [`load_failed`](Browser::load_failed) answers it.
     NeedsLoad(NodeId),
-    /// A file was activated and the app should decide what that means (open it, select it, …).
-    FileActivated(NodeId),
+    /// A file was opened (a press that did not navigate or tick) and the app should decide what that means (open it in a viewer, download, …).
+    FileOpened(NodeId),
+    /// The selection grew or shrank: re-evaluate anything keyed on it (an action button, a count line).
+    SelectionChanged,
 }
 
 /// Formats a byte count for the size column.
@@ -114,6 +118,47 @@ impl Browser {
             ],
             format_size: format_bytes,
             format_modified: format_epoch,
+        }
+    }
+
+    /// Apply one [`Event`] from the widget and report what the application must do next. This is the normal entry point: a single call in `update`, no routing knowledge on the app side.
+    ///
+    /// The mapping it hides: a row press goes to [`tap`](Self::tap) (folders navigate, files tick while the boxes are shown or report [`FileOpened`](Outcome::FileOpened) while they are not), a tree caret to [`activate`](Self::activate), the retry note to a fresh load request, a short press under the long-press mode to the row's normal press (the widget's press layer hides the row's own events until the boxes appear), and every box to the matching selection operation.
+    pub fn update(&mut self, event: Event) -> Outcome {
+        match event {
+            Event::RowPressed(id) => self.tap(id),
+            Event::CaretPressed(id) => self.activate(id),
+            Event::RetryPressed(id) => self.retry(id),
+            Event::MarkerPressed(id) => {
+                self.toggle(id);
+                Outcome::SelectionChanged
+            }
+            Event::HeaderMarkerPressed => {
+                self.toggle_all();
+                Outcome::SelectionChanged
+            }
+            Event::CrumbPressed(id) => self.goto(id),
+            Event::SortPressed(column) => {
+                self.sort_by_column(column);
+                Outcome::None
+            }
+            Event::ModeSwitchPressed => {
+                self.toggle_mode();
+                Outcome::None
+            }
+            Event::HoldStarted(id) => {
+                self.hold_started(id);
+                Outcome::None
+            }
+            Event::HoldEnded(id) => {
+                if self.hold_ended(id) {
+                    // A revealing hold armed the boxes and ticked the held row along the way.
+                    Outcome::SelectionChanged
+                } else {
+                    // Short press: the widget's press layer replaced the row button's events, so this is the row's only press.
+                    self.tap(id)
+                }
+            }
         }
     }
 

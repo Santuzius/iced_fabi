@@ -82,12 +82,21 @@ impl Browser {
         }
     }
 
-    /// Report that the listing for `id` failed; the node stays a (still expandable) branch and a later [`activate`](Browser::activate) retries.
+    /// Report that the listing for `id` failed; the node stays a (still expandable) branch and a later [`activate`](Browser::activate) or the widget's retry note asks again.
     pub fn load_failed(&mut self, id: NodeId) {
         if let Some(node) = self.nodes.get_mut(&id) {
             node.loading = false;
             node.failed = true;
         }
+    }
+
+    /// The retry behind the widget's "could not load" note: clear the failure and ask the app for the listing again.
+    pub(super) fn retry(&mut self, id: NodeId) -> Outcome {
+        if let Some(node) = self.nodes.get_mut(&id) {
+            node.failed = false;
+            node.loading = false;
+        }
+        self.request_load(id)
     }
 
     /// Mark `id` as loading now and ask the app for it next time `activate` reaches it (used for the implicit load of the root on open).

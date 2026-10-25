@@ -23,7 +23,7 @@ fn pruning_removes_selections_of_gone_entries() {
 fn remove_selected_deletes_and_prunes() {
     let mut browser = Browser::sample();
     let folder = NodeId::derive(NodeId::ROOT, EntryKind::Folder, "Finanzen");
-    browser.activate(folder);
+    let _ = browser.activate(folder);
     browser.set_children(
         folder,
         vec![Entry {
@@ -35,9 +35,9 @@ fn remove_selected_deletes_and_prunes() {
     );
     let krypto = NodeId::derive(folder, EntryKind::Folder, "Krypto");
     let file = NodeId::derive(NodeId::ROOT, EntryKind::File, "notes.txt");
-    browser.goto(krypto);
+    let _ = browser.goto(krypto);
     browser.toggle(folder);
-    browser.goto(NodeId::ROOT);
+    let _ = browser.goto(NodeId::ROOT);
     browser.toggle(file);
     browser.remove_selected();
     assert!(
@@ -63,7 +63,7 @@ fn remove_selected_deletes_and_prunes() {
 fn remove_drops_nested_ids_once_and_refuses_the_root() {
     let mut browser = Browser::sample();
     let folder = NodeId::derive(NodeId::ROOT, EntryKind::Folder, "Finanzen");
-    browser.activate(folder);
+    let _ = browser.activate(folder);
     browser.set_children(
         folder,
         vec![Entry {

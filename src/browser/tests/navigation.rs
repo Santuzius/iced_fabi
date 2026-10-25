@@ -39,7 +39,7 @@ fn a_scope_under_a_selected_ancestor_shares_its_selection() {
             modified: None,
         }],
     );
-    browser.activate(folder); // browse into it, then check an ancestor
+    let _ = browser.activate(folder); // browse into it, then check an ancestor
     browser.toggle(NodeId::ROOT);
     assert_eq!(
         browser.scope_marker(),
@@ -64,7 +64,7 @@ fn tree_rows_follow_expansion() {
     let mut browser = Browser::sample();
     let folder = NodeId::derive(NodeId::ROOT, EntryKind::Folder, "Finanzen");
     browser.set_mode(crate::Mode::Tree);
-    browser.activate(folder);
+    let _ = browser.activate(folder);
     let folder_node = browser.node(folder).unwrap();
     assert!(
         folder_node.children.is_empty(),

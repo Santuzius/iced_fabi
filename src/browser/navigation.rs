@@ -16,6 +16,14 @@ impl Browser {
         }
     }
 
+    /// The browse/tree switch: the other [`Mode`].
+    pub fn toggle_mode(&mut self) {
+        self.set_mode(match self.mode {
+            Mode::Browse => Mode::Tree,
+            Mode::Tree => Mode::Browse,
+        });
+    }
+
     /// The node whose children the browse mode shows.
     pub fn current(&self) -> NodeId {
         self.current
@@ -52,7 +60,7 @@ impl Browser {
             return Outcome::None;
         };
         if node.kind == EntryKind::File {
-            return Outcome::FileActivated(id);
+            return Outcome::FileOpened(id);
         }
         if self.mode == Mode::Tree {
             let now_expanded = !self.expanded.contains(&id);

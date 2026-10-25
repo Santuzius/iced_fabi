@@ -110,7 +110,7 @@ where
             )
             .padding([4, 6])
             .style(self.flat(self.colour(ColourField::Muted)))
-            .on_press((self.on_event)(crate::Event::Activate(id)))
+            .on_press((self.on_event)(crate::Event::RetryPressed(id)))
             .into(),
         };
         row![
@@ -143,7 +143,7 @@ where
                     icon::CHEVRON_RIGHT
                 };
                 self.icon_button(caret, 14.0, CARET, ColourField::Muted)
-                    .on_press((self.on_event)(crate::Event::Activate(row.id)))
+                    .on_press((self.on_event)(crate::Event::CaretPressed(row.id)))
                     .into()
             } else {
                 Element::from(Space::new().width(Length::Fixed(CARET)))
@@ -168,7 +168,7 @@ where
             .map(|col| self.cell_content(col.cell(self.browser, node)))
             .collect();
         let content = self.template(
-            self.marker_button(row.marker, crate::Event::Toggle(row.id)),
+            self.marker_button(row.marker, crate::Event::MarkerPressed(row.id)),
             name.into(),
             cells,
         );
@@ -197,7 +197,7 @@ where
                     ..button::Style::default()
                 }
             })
-            .on_press((self.on_event)(crate::Event::Activate(row.id)))
+            .on_press((self.on_event)(crate::Event::RowPressed(row.id)))
             .into();
         if self.checkboxes
             && self.browser.selection_ui() == crate::SelectionUi::LongPress

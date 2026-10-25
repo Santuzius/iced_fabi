@@ -124,9 +124,9 @@ pub enum SelectionMode {
 /// How selection can happen at all — the widget's mode.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum SelectionUi {
-    /// No selection at all: a pure file view. The boxes never appear and [`toggle`](crate::Browser::toggle) does nothing; tapping a file reports [`Outcome::FileActivated`](crate::Outcome::FileActivated) like in tree mode.
+    /// No selection at all: a pure file view. The boxes never appear and [`toggle`](crate::Browser::toggle) does nothing; tapping a file reports [`Outcome::FileOpened`](crate::Outcome::FileOpened) like in tree mode.
     ViewOnly,
-    /// Selection, but the boxes are hidden until a row is pressed and held for at least [`LONG_PRESS`](super::long_press::LONG_PRESS): the hold arms the selection, the boxes appear on every row and the held row itself is ticked; this stays until the app calls [`disarm`](crate::Browser::disarm). While unarmed, taps keep their normal meaning (folders navigate, files report [`Outcome::FileActivated`](crate::Outcome::FileActivated)).
+    /// Selection, but the boxes are hidden until a row is pressed and held for at least [`LONG_PRESS`](super::long_press::LONG_PRESS): the hold arms the selection, the boxes appear on every row and the held row itself is ticked; this stays until the app calls [`disarm`](crate::Browser::disarm). While unarmed, taps keep their normal meaning (folders navigate, files report [`Outcome::FileOpened`](crate::Outcome::FileOpened)).
     LongPress,
     /// Normal: a box sits on every row and taps tick.
     #[default]

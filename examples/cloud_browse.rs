@@ -703,49 +703,10 @@ impl App {
 
     fn update(&mut self, message: Message) -> Task<Message> {
         match message {
-            Message::Cabinet(event) => match event {
-                Event::Activate(id) => {
-                    let outcome = self.browser.tap(id);
-                    Task::done(self.accept(outcome))
-                }
-                Event::Toggle(id) => {
-                    self.browser.toggle(id);
-                    Task::none()
-                }
-                Event::HoldStarted(id) => {
-                    self.browser.hold_started(id);
-                    Task::none()
-                }
-                Event::HoldEnded(id) => {
-                    // While the boxes are hidden the press layer swallows the row button's own
-                    // events: a short press has to be applied here as the row's normal tap.
-                    if self.browser.hold_ended(id) {
-                        Task::none()
-                    } else {
-                        let outcome = self.browser.tap(id);
-                        Task::done(self.accept(outcome))
-                    }
-                }
-                Event::ToggleAll => {
-                    self.browser.toggle_all();
-                    Task::none()
-                }
-                Event::GoTo(id) => {
-                    let outcome = self.browser.goto(id);
-                    Task::done(self.accept(outcome))
-                }
-                Event::Sort(column) => {
-                    self.browser.sort_by_column(column);
-                    Task::none()
-                }
-                Event::ToggleMode => {
-                    self.browser.set_mode(match self.browser.mode() {
-                        iced_fabi::Mode::Browse => iced_fabi::Mode::Tree,
-                        iced_fabi::Mode::Tree => iced_fabi::Mode::Browse,
-                    });
-                    Task::none()
-                }
-            },
+            Message::Cabinet(event) => {
+                let outcome = self.browser.update(event);
+                Task::done(self.accept(outcome))
+            }
             Message::Checkboxes(choice) => {
                 self.checkboxes = choice;
                 Task::none()
@@ -881,10 +842,10 @@ impl App {
                 });
             }
             // This example has no files to open; tapping a file selects it instead.
-            Outcome::FileActivated(id) => {
+            Outcome::FileOpened(id) => {
                 self.browser.toggle(id);
             }
-            Outcome::None => {}
+            Outcome::SelectionChanged | Outcome::None => {}
         }
         Message::Tick
     }

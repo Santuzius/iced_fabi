@@ -1,6 +1,5 @@
 use crate::Marker;
-use crate::browser::Browser;
-use crate::browser::{Entry, EntryKind, NodeId, Outcome};
+use crate::browser::{Browser, Entry, EntryKind, NodeId, Outcome};
 
 #[test]
 fn partial_marker_propagates_up() {
@@ -211,7 +210,7 @@ fn toggle_all_selects_then_clears_only_inside_the_scope() {
     let outside = NodeId::derive(NodeId::ROOT, EntryKind::File, "notes.txt");
     browser.toggle(outside);
     let folder = NodeId::derive(NodeId::ROOT, EntryKind::Folder, "Finanzen");
-    browser.activate(folder);
+    let _ = browser.activate(folder);
     browser.set_children(
         folder,
         vec![Entry {
@@ -287,10 +286,10 @@ fn view_only_mode_never_selects() {
     );
     assert_eq!(
         browser.tap(notes),
-        Outcome::FileActivated(notes),
+        Outcome::FileOpened(notes),
         "files just report"
     );
-    assert_eq!(browser.activate(notes), Outcome::FileActivated(notes));
+    assert_eq!(browser.activate(notes), Outcome::FileOpened(notes));
     // Existing selections are dropped on the way in, and selection comes back on the way out.
     browser.set_selection_ui(crate::SelectionUi::Select);
     browser.toggle(notes);

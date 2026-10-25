@@ -21,9 +21,12 @@ where
 {
     /// The select-all box and the sort headers — or, while something is selected, the selection count.
     pub(super) fn column_header(&self) -> Element<'a, Message, Theme, Renderer> {
-        let marker = self
-            .boxes_shown()
-            .then(|| self.marker_button(self.browser.scope_marker(), crate::Event::ToggleAll));
+        let marker = self.boxes_shown().then(|| {
+            self.marker_button(
+                self.browser.scope_marker(),
+                crate::Event::HeaderMarkerPressed,
+            )
+        });
         let tree = self.browser.mode() == Mode::Tree;
         let content = if self.browser.has_selection() {
             let count = self.browser.selected().count();
@@ -97,7 +100,7 @@ where
             text_color: colour(theme),
             ..button::Style::default()
         })
-        .on_press((self.on_event)(crate::Event::Sort(index)))
+        .on_press((self.on_event)(crate::Event::SortPressed(index)))
         .into()
     }
 
