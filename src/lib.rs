@@ -198,7 +198,7 @@ pub enum Separators {
     /// Plain rows, no lines.
     #[default]
     None,
-    /// A line between each item.
+    /// A line between each item and below the last.
     Horizontal,
     /// A line between each column.
     Vertical,
@@ -762,31 +762,41 @@ where
     // --- rows ---
 
     fn browse_list(&self) -> Element<'a, Message, Theme, Renderer> {
+        let rows = self.browser.browse_rows();
         let mut list = column![];
-        for (index, row) in self.browser.browse_rows().iter().enumerate() {
+        for (index, row) in rows.iter().enumerate() {
             if index > 0 && self.separators.horizontal() {
                 list = list.push(self.hrule());
             }
             list = list.push(self.line(row, false, index % 2 == 1));
         }
         let current = self.browser.node(self.browser.current());
+        let mut status = false;
         if current.is_some_and(|n| n.loading) {
             list = list.push(self.status_line("Loading…", None, 0.0));
+            status = true;
         } else if current.is_some_and(|n| n.failed) {
             list = list.push(self.status_line(
                 "Could not load — tap to retry",
                 Some(self.browser.current()),
                 0.0,
             ));
+            status = true;
         } else if current.is_some_and(|n| n.children_known && n.children.is_empty()) {
             list = list.push(self.status_line("Empty", None, 0.0));
+            status = true;
+        }
+        // The last entry gets a line below it too, the same colour as the ones between the rows.
+        if self.separators.horizontal() && (!rows.is_empty() || status) {
+            list = list.push(self.hrule());
         }
         list.into()
     }
 
     fn tree_list(&self) -> Element<'a, Message, Theme, Renderer> {
+        let rows = self.browser.tree_rows();
         let mut list = column![];
-        for (index, row) in self.browser.tree_rows().iter().enumerate() {
+        for (index, row) in rows.iter().enumerate() {
             if index > 0 && self.separators.horizontal() {
                 list = list.push(self.hrule());
             }
@@ -808,6 +818,9 @@ where
                     ));
                 }
             }
+        }
+        if self.separators.horizontal() && !rows.is_empty() {
+            list = list.push(self.hrule());
         }
         list.into()
     }
