@@ -111,7 +111,7 @@ where
         if let Some(action) = self
             .action
             .as_ref()
-            .filter(|_| self.action_placement == ActionPlacement::ToolbarEnd)
+            .filter(|a| a.placement == ActionPlacement::ToolbarEnd)
         {
             if has_tools || self.mode_toggle {
                 toolbar = toolbar.push(self.divider());

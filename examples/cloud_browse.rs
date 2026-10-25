@@ -950,7 +950,7 @@ impl App {
         let show = |enabled: bool| self.inactive == InactiveChoice::GreyedOut || enabled;
         let (base_style, stripe_factor): (fn(&Theme) -> iced_fabi::Style, f32) = match self.theme {
             ThemeChoice::DefaultLight | ThemeChoice::DefaultDark => {
-                (iced_fabi::default_style, self.zebra.stripe())
+                (iced_fabi::Style::from_theme, self.zebra.stripe())
             }
             ThemeChoice::SyncativeLight | ThemeChoice::SyncativeDark => {
                 (syncative_style, self.zebra.stripe())
@@ -965,7 +965,7 @@ impl App {
             IconChoice::Tabler => &iced_fabi::TablerIcons,
             IconChoice::MaterialIconTheme => &MaterialIconTheme,
         };
-        let mut cabinet = iced_fabi::cabinet(&self.browser, &Message::Cabinet)
+        let mut cabinet = iced_fabi::cabinet(&self.browser, Message::Cabinet)
             .style(style)
             .icons(icons)
             .separators(self.lines)
@@ -995,16 +995,18 @@ impl App {
         }
         // The selection's action button: text and message are the app's, placement is picked in the bar.
         if show(has_selection) {
-            cabinet = cabinet
-                .action_button("Delete selected", Message::Delete)
-                .action_placement(match self.action {
-                    ActionChoice::Wide => iced_fabi::ActionPlacement::WideCenter,
-                    ActionChoice::Floating => iced_fabi::ActionPlacement::Floating,
-                    ActionChoice::Toolbar => iced_fabi::ActionPlacement::ToolbarEnd,
-                });
+            cabinet = cabinet.action(
+                iced_fabi::ActionButton::new("Delete selected", Message::Delete).placement(
+                    match self.action {
+                        ActionChoice::Wide => iced_fabi::ActionPlacement::WideCenter,
+                        ActionChoice::Floating => iced_fabi::ActionPlacement::Floating,
+                        ActionChoice::Toolbar => iced_fabi::ActionPlacement::ToolbarEnd,
+                    },
+                ),
+            );
         }
         if !syncative {
-            return column![bar, cabinet.build()].padding(16).spacing(8).into();
+            return column![bar, cabinet].padding(16).spacing(8).into();
         }
         // Syncative's page: the header bar over a hairline, the content on a card on the page background (paddings from `syncative/src/screens/remote_page.rs`).
         let header = container(bar)

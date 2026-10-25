@@ -22,11 +22,11 @@ use crate::{
     Mode,
     browser::Browser,
     icon::{RowIcons, TablerIcons},
-    style::{Style, default_style},
+    style::Style,
     tool::Tool,
 };
 
-pub use action::ActionPlacement;
+pub use action::{ActionButton, ActionPlacement};
 pub use labels::Labels;
 
 /// Which separator lines the list draws; [`separators`](Cabinet::separators).
@@ -72,20 +72,13 @@ pub(super) enum ToolbarItem<'a, Message> {
 /// A scrollbar style function as [`scrollbar`](Cabinet::scrollbar) stores it.
 type ScrollbarStyle<'a> = Rc<dyn Fn(&Theme, scrollable::Status) -> scrollable::Style + 'a>;
 
-/// The cabinet's one action button; see [`action_button`](Cabinet::action_button).
-pub(super) struct Action<Message> {
-    pub(super) text: String,
-    pub(super) on_press: Message,
-}
-
-/// The file cabinet as a builder: call [`cabinet`] (or [`file_cabinet`] for the defaults) and configure toolbar and colours before [`build`](Self::build)ing.
+/// The file cabinet as a builder: call [`cabinet`] and configure toolbar, action button and colours, then end the chain with `.into()` (or [`build`](Self::build)) to get the [`Element`].
 pub struct Cabinet<'a, Message: Clone, Renderer> {
     pub(super) browser: &'a Browser,
-    pub(super) on_event: &'a dyn Fn(crate::Event) -> Message,
     pub(super) tools: Vec<ToolbarItem<'a, Message>>,
     pub(super) mode_toggle: bool,
-    pub(super) action: Option<Action<Message>>,
-    pub(super) action_placement: ActionPlacement,
+    pub(super) action: Option<ActionButton<'a, Message>>,
+    pub(super) on_event: Box<dyn Fn(crate::Event) -> Message + 'a>,
     pub(super) style: Rc<dyn Fn(&Theme) -> Style + 'a>,
     pub(super) icons: &'a dyn RowIcons,
     pub(super) separators: Separators,
@@ -99,19 +92,18 @@ pub struct Cabinet<'a, Message: Clone, Renderer> {
 /// Start building the widget over `browser`; `on_event` maps the widget's events to your messages.
 pub fn cabinet<'a, Message, Renderer>(
     browser: &'a Browser,
-    on_event: &'a dyn Fn(crate::Event) -> Message,
+    on_event: impl Fn(crate::Event) -> Message + 'a,
 ) -> Cabinet<'a, Message, Renderer>
 where
     Message: Clone + 'a,
 {
     Cabinet {
         browser,
-        on_event,
+        on_event: Box::new(on_event),
         tools: Vec::new(),
         mode_toggle: true,
         action: None,
-        action_placement: ActionPlacement::default(),
-        style: Rc::new(default_style),
+        style: Rc::new(Style::from_theme),
         icons: &TablerIcons,
         separators: Separators::default(),
         labels: Labels::default(),
@@ -122,19 +114,17 @@ where
     }
 }
 
-/// The default cabinet: toolbar with breadcrumbs, sort header and the row list for the browser's current mode, with the built-in mode switch only.
-pub fn file_cabinet<'a, Message, Renderer>(
-    browser: &'a Browser,
-    on_event: &'a dyn Fn(crate::Event) -> Message,
-) -> Element<'a, Message, Theme, Renderer>
+impl<'a, Message: Clone + 'a, Renderer> From<Cabinet<'a, Message, Renderer>>
+    for Element<'a, Message, Theme, Renderer>
 where
-    Message: Clone + 'a,
     Renderer: iced_widget::core::text::Renderer<Font = Font>
         + iced_widget::core::svg::Renderer
         + iced_widget::core::Renderer
         + 'a,
 {
-    cabinet(browser, on_event).build()
+    fn from(cabinet: Cabinet<'a, Message, Renderer>) -> Self {
+        cabinet.build()
+    }
 }
 
 impl<'a, Message: Clone + 'a, Renderer> Cabinet<'a, Message, Renderer>
@@ -167,18 +157,9 @@ where
         self.browser.boxes_visible()
     }
 
-    /// The cabinet's one text button for the app's main action (download, share, delete, …): it is clickable while at least one entry is selected and otherwise grey like an inactive tool; `on_press` is sent on a click and what follows is the application's business. It is a pill with completely round corners; where it sits: see [`action_placement`](Self::action_placement).
-    pub fn action_button(mut self, text: impl Into<String>, on_press: Message) -> Self {
-        self.action = Some(Action {
-            text: text.into(),
-            on_press,
-        });
-        self
-    }
-
-    /// Where the [`action_button`](Self::action_button) goes; ignored without one. Default: [`ActionPlacement::WideCenter`].
-    pub fn action_placement(mut self, placement: ActionPlacement) -> Self {
-        self.action_placement = placement;
+    /// The cabinet's one action button (download, share, delete, …), built with [`ActionButton`]; ignored without one.
+    pub fn action(mut self, action: ActionButton<'a, Message>) -> Self {
+        self.action = Some(action);
         self
     }
 
@@ -236,18 +217,16 @@ where
         }
         // The floating action button hovers over the row list: stacked onto the list itself, its padding measures equal distances from the list's right and bottom edges.
         let list: Element<'a, Message, Theme, Renderer> = match &self.action {
-            Some(action) if self.action_placement == ActionPlacement::Floating => {
-                iced_widget::stack![
-                    list,
-                    container(self.action_button_element(action, ActionPlacement::Floating))
-                        .width(Length::Fill)
-                        .height(Length::Fill)
-                        .align_x(iced_widget::core::Alignment::End)
-                        .align_y(iced_widget::core::Alignment::End)
-                        .padding(16)
-                ]
-                .into()
-            }
+            Some(action) if action.placement == ActionPlacement::Floating => iced_widget::stack![
+                list,
+                container(self.action_button_element(action, ActionPlacement::Floating))
+                    .width(Length::Fill)
+                    .height(Length::Fill)
+                    .align_x(iced_widget::core::Alignment::End)
+                    .align_y(iced_widget::core::Alignment::End)
+                    .padding(16)
+            ]
+            .into(),
             _ => list.into(),
         };
         let mut body = iced_widget::column![
@@ -260,7 +239,7 @@ where
         if let Some(action) = self
             .action
             .as_ref()
-            .filter(|_| self.action_placement == ActionPlacement::WideCenter)
+            .filter(|a| a.placement == ActionPlacement::WideCenter)
         {
             body = body.push(
                 container(self.action_button_element(action, ActionPlacement::WideCenter))

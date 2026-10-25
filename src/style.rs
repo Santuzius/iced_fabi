@@ -2,7 +2,7 @@
 
 use iced_widget::core::{Color, Theme};
 
-/// The widget's colours. Defaults from the theme's palette (see [`default_style`]); override the whole thing per theme in [`style`](crate::Cabinet::style) to apply your app's design.
+/// The widget's colours. Defaults from the theme's palette (see [`from_theme`](Self::from_theme)); override the whole thing per theme in [`style`](crate::Cabinet::style) to apply your app's design.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Style {
     /// Primary text and icons (file kind glyphs).
@@ -48,48 +48,52 @@ pub(super) fn mix(a: Color, b: Color, t: f32) -> Color {
 }
 
 /// [`Style`] from the theme's palette.
-pub fn default_style(theme: &Theme) -> Style {
-    let palette = theme.palette();
-    let extended = theme.extended_palette();
-    let selection = extended.primary.weak.color;
-    Style {
-        text: palette.text,
-        muted: Color {
-            a: 0.6,
-            ..palette.text
-        },
-        accent: palette.primary,
-        on_accent: if 0.299 * palette.primary.r
-            + 0.587 * palette.primary.g
-            + 0.114 * palette.primary.b
-            < 0.5
-        {
-            Color::WHITE
-        } else {
-            Color::BLACK
-        },
-        accent_hover: mix(palette.primary, palette.text, 0.12),
-        folder: mix(palette.primary, palette.background, 0.3),
-        selection,
-        row_hover: Color {
-            a: 0.35,
-            ..selection
-        },
-        header: mix(palette.background, Color::BLACK, 0.06),
-        line: Color {
-            a: 0.15,
-            ..palette.text
-        },
-        stripe: 0.0,
-        background: palette.background,
-        hover: Color {
-            a: 0.08,
-            ..palette.text
-        },
-        pressed: Color {
-            a: 0.14,
-            ..palette.text
-        },
-        radius: 4.0,
+impl Style {
+    /// Every field from the active iced theme's palette — the widget's default (what [`style`](crate::Cabinet::style) starts with).
+    #[must_use]
+    pub fn from_theme(theme: &Theme) -> Style {
+        let palette = theme.palette();
+        let extended = theme.extended_palette();
+        let selection = extended.primary.weak.color;
+        Style {
+            text: palette.text,
+            muted: Color {
+                a: 0.6,
+                ..palette.text
+            },
+            accent: palette.primary,
+            on_accent: if 0.299 * palette.primary.r
+                + 0.587 * palette.primary.g
+                + 0.114 * palette.primary.b
+                < 0.5
+            {
+                Color::WHITE
+            } else {
+                Color::BLACK
+            },
+            accent_hover: mix(palette.primary, palette.text, 0.12),
+            folder: mix(palette.primary, palette.background, 0.3),
+            selection,
+            row_hover: Color {
+                a: 0.35,
+                ..selection
+            },
+            header: mix(palette.background, Color::BLACK, 0.06),
+            line: Color {
+                a: 0.15,
+                ..palette.text
+            },
+            stripe: 0.0,
+            background: palette.background,
+            hover: Color {
+                a: 0.08,
+                ..palette.text
+            },
+            pressed: Color {
+                a: 0.14,
+                ..palette.text
+            },
+            radius: 4.0,
+        }
     }
 }
