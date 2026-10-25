@@ -19,7 +19,7 @@ fn main() -> iced::Result {
         // Syncative's UI font; the default themes show it too, since iced fixes the font for the whole run.
         .default_font(SYNCATIVE_FONT)
         // Wide enough for the whole configuration bar.
-        .window_size((1460.0, 760.0))
+        .window_size((1720.0, 760.0))
         .run()
 }
 
@@ -35,6 +35,7 @@ enum Message {
     Lines(iced_fabi::Separators),
     Zebra(ZebraChoice),
     Checkboxes(CheckboxChoice),
+    Entries(EntryChoice),
     Tick,
 }
 
@@ -122,6 +123,24 @@ impl fmt::Display for CheckboxChoice {
 }
 
 const CHECKBOX_CHOICES: &[CheckboxChoice] = &[CheckboxChoice::On, CheckboxChoice::Off];
+
+/// Which kinds of entries the lists show.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum EntryChoice {
+    All,
+    FoldersOnly,
+}
+
+impl fmt::Display for EntryChoice {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(match self {
+            Self::All => "files & folders",
+            Self::FoldersOnly => "folders only",
+        })
+    }
+}
+
+const ENTRY_CHOICES: &[EntryChoice] = &[EntryChoice::All, EntryChoice::FoldersOnly];
 
 const LINES: &[iced_fabi::Separators] = &[
     iced_fabi::Separators::None,
@@ -571,12 +590,15 @@ struct App {
     lines: iced_fabi::Separators,
     zebra: ZebraChoice,
     checkboxes: CheckboxChoice,
+    entries: EntryChoice,
 }
 
 impl App {
     fn boot() -> (Self, Task<Message>) {
         let mut browser = Browser::new("My files");
         browser.add_column(TypeColumn);
+        // The file kinds the cabinet may show — an app-side decision made here at init; to offer only PDFs, write ["pdf"].
+        browser.set_file_extensions(["pdf", "docx", "md", "txt"]);
         // Ask for the root immediately; everything else loads on navigation.
         let outcome = browser.activate(iced_fabi::NodeId::ROOT);
         let mut app = App {
@@ -590,6 +612,7 @@ impl App {
             lines: iced_fabi::Separators::Both,
             zebra: ZebraChoice::Off,
             checkboxes: CheckboxChoice::On,
+            entries: EntryChoice::All,
         };
         let task = Task::done(app.accept(outcome));
         (app, task)
@@ -628,6 +651,12 @@ impl App {
             },
             Message::Checkboxes(choice) => {
                 self.checkboxes = choice;
+                Task::none()
+            }
+            Message::Entries(choice) => {
+                self.entries = choice;
+                self.browser
+                    .set_folders_only(choice == EntryChoice::FoldersOnly);
                 Task::none()
             }
             Message::Copy => {
@@ -820,6 +849,14 @@ impl App {
                 &self.checkboxes,
                 Message::Checkboxes,
                 90.0,
+                syncative
+            ),
+            label("Entries"),
+            dropdown(
+                ENTRY_CHOICES,
+                &self.entries,
+                Message::Entries,
+                140.0,
                 syncative
             ),
         ]

@@ -264,6 +264,10 @@ pub struct Browser {
     sort_ascending: bool,
     /// Folders sort before files regardless of the key, as file managers usually do.
     folders_first: bool,
+    /// Hide file rows and list folders only.
+    folders_only: bool,
+    /// When set, a file row appears only if its extension (after the last dot, case-insensitive) is in this list; folders are unaffected. `None` lists every file.
+    extensions: Option<Vec<String>>,
     mode: Mode,
     columns: Vec<Box<dyn Column>>,
     format_size: FormatSize,
@@ -294,6 +298,8 @@ impl Browser {
             sort_column: 0,
             sort_ascending: true,
             folders_first: true,
+            folders_only: false,
+            extensions: None,
             mode: Mode::Browse,
             columns: vec![
                 Box::new(NameColumn),
@@ -365,6 +371,50 @@ impl Browser {
 
     pub fn set_folders_first(&mut self, yes: bool) {
         self.folders_first = yes;
+    }
+
+    /// List folders only: every file row disappears from both modes, so files cannot be reached or selected while hidden. Default: off.
+    pub fn set_folders_only(&mut self, yes: bool) {
+        self.folders_only = yes;
+    }
+
+    /// Show only files whose extension — the part after the last dot, compared case-insensitively — is one of these; folders are unaffected. This is the app-side knob, usually set once while building the [`Browser`]; a file without a dot never passes while a filter is set. [`show_all_files`](Self::show_all_files) (the default) lists every file again.
+    pub fn set_file_extensions(&mut self, extensions: impl IntoIterator<Item = impl Into<String>>) {
+        self.extensions = Some(
+            extensions
+                .into_iter()
+                .map(|ext| {
+                    let mut ext: String = ext.into();
+                    ext.make_ascii_lowercase();
+                    ext
+                })
+                .collect(),
+        );
+    }
+
+    /// Undo [`set_file_extensions`](Self::set_file_extensions): every file is listed again.
+    pub fn show_all_files(&mut self) {
+        self.extensions = None;
+    }
+
+    /// Whether the node's row appears in the lists under the current visibility settings.
+    fn is_listed(&self, id: NodeId) -> bool {
+        let Some(node) = self.nodes.get(&id) else {
+            return false;
+        };
+        if node.kind == EntryKind::Folder {
+            return true;
+        }
+        if self.folders_only {
+            return false;
+        }
+        match &self.extensions {
+            None => true,
+            Some(exts) => node
+                .name
+                .rsplit_once('.')
+                .is_some_and(|(_, ext)| exts.iter().any(|e| e.eq_ignore_ascii_case(ext))),
+        }
     }
 
     /// The node whose children the browse mode shows.
@@ -456,10 +506,16 @@ impl Browser {
     /// The marker of the header's select-all box: ticked when the scope, one of its ancestors, or every one of its children is selected, a dot when something below the scope is.
     pub fn scope_marker(&self) -> Marker {
         let scope = self.scope();
-        let children = self
+        let children: Vec<NodeId> = self
             .nodes
             .get(&scope)
-            .map(|node| node.children.as_slice())
+            .map(|node| {
+                node.children
+                    .iter()
+                    .copied()
+                    .filter(|id| self.is_listed(*id))
+                    .collect()
+            })
             .unwrap_or_default();
         if self.selected.contains(&scope)
             || self.selected_ancestor(scope).is_some()
@@ -507,7 +563,12 @@ impl Browser {
         if !node.children_known {
             return;
         }
-        let children = node.children.clone();
+        let children: Vec<NodeId> = node
+            .children
+            .iter()
+            .copied()
+            .filter(|id| self.is_listed(*id))
+            .collect();
         self.selected.extend(children);
     }
 
@@ -539,6 +600,7 @@ impl Browser {
         };
         self.sorted(&current.children)
             .into_iter()
+            .filter(|id| self.is_listed(*id))
             .map(|id| Row {
                 id,
                 depth: 0,
@@ -561,6 +623,9 @@ impl Browser {
             return;
         };
         let expanded = self.expanded.contains(&id);
+        if !self.is_listed(id) {
+            return;
+        }
         rows.push(Row {
             id,
             depth,
@@ -1400,6 +1465,53 @@ mod tests {
         assert_eq!(rows.len(), 2);
         let first = browser.node(rows[0].id).unwrap();
         assert_eq!(first.kind, EntryKind::Folder);
+    }
+
+    #[test]
+    fn folders_only_hides_files_in_both_modes() {
+        let mut browser = sample();
+        browser.set_mode(Mode::Tree);
+        browser.set_folders_only(true);
+        let names = |rows: &[Row]| -> Vec<String> {
+            rows.iter()
+                .map(|r| browser.node(r.id).unwrap().name.clone())
+                .collect()
+        };
+        assert_eq!(names(&browser.browse_rows()), vec!["Finanzen"]);
+        assert_eq!(names(&browser.tree_rows()), vec!["My files", "Finanzen"]);
+        browser.set_folders_only(false);
+        assert_eq!(browser.browse_rows().len(), 2, "the file comes back");
+    }
+
+    #[test]
+    fn file_extension_filter_keeps_folders_and_matching_files() {
+        let mut browser = sample();
+        browser.set_file_extensions(["txt"]);
+        let names: Vec<String> = browser
+            .browse_rows()
+            .iter()
+            .map(|r| browser.node(r.id).unwrap().name.clone())
+            .collect();
+        assert_eq!(names, vec!["Finanzen", "notes.txt"]);
+        browser.set_file_extensions(["pdf"]);
+        assert_eq!(
+            browser.browse_rows().len(),
+            1,
+            "no pdf here, only the folder"
+        );
+        // Select-all inside the scope only reaches listed children.
+        browser.select_all();
+        let hidden = NodeId::derive(NodeId::ROOT, EntryKind::File, "notes.txt");
+        assert!(
+            !browser.selected().any(|id| id == hidden),
+            "an unlisted file is never selected by select-all"
+        );
+        browser.show_all_files();
+        assert_eq!(
+            browser.browse_rows().len(),
+            2,
+            "no filter: every file again"
+        );
     }
 
     #[test]
