@@ -11,6 +11,17 @@ fn into_folder(browser: &mut Browser) -> NodeId {
 }
 
 #[test]
+fn open_asks_for_the_root_listing_once() {
+    let mut browser = Browser::new("My files");
+    assert_eq!(browser.open(), Outcome::NeedsLoad(NodeId::ROOT));
+    assert_eq!(
+        browser.open(),
+        Outcome::None,
+        "already loading: no second request"
+    );
+}
+
+#[test]
 fn row_pressed_on_a_folder_navigates_and_asks_for_the_listing() {
     let mut browser = Browser::sample();
     let folder = NodeId::derive(NodeId::ROOT, EntryKind::Folder, "Finanzen");

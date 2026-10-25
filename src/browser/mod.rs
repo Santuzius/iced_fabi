@@ -81,7 +81,7 @@ pub struct Browser {
 }
 
 impl Browser {
-    /// A browser whose root is a folder named `root`, not listed yet: opening it means calling [`activate`](Self::activate) on [`NodeId::ROOT`], which asks the app for the root's children. The columns start as Name, Modified, Size.
+    /// A browser whose root is a folder named `root`, not listed yet: [`open`](Browser::open) asks the app for the root's children. The columns start as Name, Modified, Size.
     pub fn new(root: impl Into<String>) -> Self {
         let root_name = root.into();
         let node = Node {
@@ -119,6 +119,11 @@ impl Browser {
             format_size: format_bytes,
             format_modified: format_epoch,
         }
+    }
+
+    /// Start the browser on its root: everything is configured, now ask for the root listing. On a fresh browser this always returns [`NeedsLoad`](Outcome::NeedsLoad)([`NodeId::ROOT`]) — act on it before the first draw, e.g. `Task::done` a fetch message in `main`. It is a plain `&mut self` method, so it fits both a configuration chain (`browser` built first, then `let outcome = browser.open();`) and re-opening an existing browser.
+    pub fn open(&mut self) -> Outcome {
+        self.request_load(NodeId::ROOT)
     }
 
     /// Apply one [`Event`] from the widget and report what the application must do next. This is the normal entry point: a single call in `update`, no routing knowledge on the app side.

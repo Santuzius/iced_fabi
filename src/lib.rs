@@ -18,7 +18,7 @@
 //!
 //! [`Cabinet`] is rebuilt on every draw from [`cabinet`] and carries the look of that one draw: the [`checkboxes`](Cabinet::checkboxes) column, the toolbar [`tool`](Cabinet::tool)s, the [`action_button`](Cabinet::action_button) and where it sits ([`action_placement`](Cabinet::action_placement)), [`separators`](Cabinet::separators), [`style`](Cabinet::style), [`icons`](Cabinet::icons), [`text_size`](Cabinet::text_size), [`font`](Cabinet::font) and [`scrollbar`](Cabinet::scrollbar).
 //!
-//! The widget talks to the app in two directions only: it emits [`Event`]s — hand each one to [`Browser::update`] in your `update`, and the returned [`Outcome`] says what to do next (fetch, open, or nothing) — and it receives listings via [`set_children`](Browser::set_children).
+//! The widget talks to the app in two directions only: it emits [`Event`]s — hand each one to [`Browser::update`] in your `update`, and the returned [`Outcome`] says what to do next (fetch, open, or nothing) — and it receives listings via [`set_children`](Browser::set_children). Start-up: after configuring the browser, call [`open`](Browser::open) and act on its [`Outcome::NeedsLoad`] before the first draw.
 //!
 //! ```no_run
 //! use iced_fabi::{Browser, Event, file_cabinet};

@@ -680,7 +680,7 @@ impl App {
         // The file kinds the cabinet may show — an app-side decision made here at init; to offer only PDFs, write ["pdf"].
         browser.set_file_extensions(["pdf", "docx", "md", "txt"]);
         // Ask for the root immediately; everything else loads on navigation.
-        let outcome = browser.activate(iced_fabi::NodeId::ROOT);
+        let outcome = browser.open();
         let mut app = App {
             browser,
             cloud: fake_cloud(),
