@@ -83,7 +83,7 @@ pub struct Node {
 pub enum Marker {
     /// Empty box; the node and its loaded content are unselected.
     Unselected,
-    /// Tick; the node itself is selected as a unit — in the app's semantics typically its whole subtree, whether or not the subtree is loaded.
+    /// Tick; the node is selected as a unit — explicitly or because one of its ancestors is, which covers it the same way — in the app's semantics typically its whole subtree, whether or not the subtree is loaded.
     Selected,
     /// Dot in the box; some node below this one is selected, but this node is not selected itself.
     Partial,
@@ -453,7 +453,7 @@ impl Browser {
         }
     }
 
-    /// The marker of the header's select-all box: ticked when the scope or every one of its children is selected, a dot when something below the scope is.
+    /// The marker of the header's select-all box: ticked when the scope, one of its ancestors, or every one of its children is selected, a dot when something below the scope is.
     pub fn scope_marker(&self) -> Marker {
         let scope = self.scope();
         let children = self
@@ -462,6 +462,7 @@ impl Browser {
             .map(|node| node.children.as_slice())
             .unwrap_or_default();
         if self.selected.contains(&scope)
+            || self.selected_ancestor(scope).is_some()
             || (!children.is_empty() && children.iter().all(|child| self.selected.contains(child)))
         {
             Marker::Selected
@@ -472,9 +473,13 @@ impl Browser {
         }
     }
 
-    /// The header's select-all box clicked: select every child of the scope when nothing in it is selected, otherwise clear the selection within the scope.
+    /// The header's select-all box clicked: select every child of the scope when nothing in it is selected, otherwise clear the selection within the scope. When the scope is only ticked because an ancestor is selected, that unticks the ancestor — the same rule as for a covered row's box, see [`toggle`](Self::toggle).
     pub fn toggle_all(&mut self) {
         let scope = self.scope();
+        if let Some(ancestor) = self.selected_ancestor(scope) {
+            self.selected.remove(&ancestor);
+            return;
+        }
         if self.scope_marker() == Marker::Unselected {
             self.select_all();
         } else {
@@ -490,10 +495,10 @@ impl Browser {
         }
     }
 
-    /// Select every child of the scope node — the current directory in browse mode, the root in tree mode — provided it is listed. Does nothing while the scope itself is selected (its children are already covered by it).
+    /// Select every child of the scope node — the current directory in browse mode, the root in tree mode — provided it is listed. Does nothing while the scope itself or one of its ancestors is selected (the children are already covered).
     pub fn select_all(&mut self) {
         let scope = self.scope();
-        if self.selected.contains(&scope) {
+        if self.selected.contains(&scope) || self.selected_ancestor(scope).is_some() {
             return;
         }
         let Some(node) = self.nodes.get(&scope) else {
@@ -506,9 +511,9 @@ impl Browser {
         self.selected.extend(children);
     }
 
-    /// The marker this node shows.
+    /// The marker this node shows: a tick when it is selected, explicitly or covered by a selected ancestor, a dot when something below it is selected, otherwise an empty box. A covered node therefore looks selected, mirroring what [`toggle`](Self::toggle) does when one of its boxes is tapped.
     pub fn marker(&self, id: NodeId) -> Marker {
-        if self.selected.contains(&id) {
+        if self.selected.contains(&id) || self.selected_ancestor(id).is_some() {
             Marker::Selected
         } else if self.has_selected_below(id) {
             Marker::Partial
@@ -989,6 +994,72 @@ mod tests {
         assert!(
             !browser.has_selection(),
             "tapping under a checked root unchecks it"
+        );
+    }
+
+    #[test]
+    fn selected_folder_ticks_its_loaded_children() {
+        let mut browser = sample();
+        let folder = NodeId::derive(NodeId::ROOT, EntryKind::Folder, "Finanzen");
+        browser.set_children(
+            folder,
+            vec![Entry {
+                name: "beleg.pdf".into(),
+                kind: EntryKind::File,
+                size: None,
+                modified: None,
+            }],
+        );
+        let child = NodeId::derive(folder, EntryKind::File, "beleg.pdf");
+        browser.toggle(folder);
+        assert_eq!(
+            browser.marker(child),
+            Marker::Selected,
+            "the folder's tick shows on the child row too"
+        );
+        assert_eq!(
+            browser.selected().collect::<Vec<_>>(),
+            vec![folder],
+            "the selection set stays normalized: only the folder is explicit"
+        );
+        browser.toggle(child);
+        assert!(
+            !browser.has_selection(),
+            "tapping a covered row unticks the folder"
+        );
+        assert_eq!(browser.marker(child), Marker::Unselected);
+    }
+
+    #[test]
+    fn a_scope_under_a_selected_ancestor_shares_its_selection() {
+        let mut browser = sample();
+        let folder = NodeId::derive(NodeId::ROOT, EntryKind::Folder, "Finanzen");
+        browser.set_children(
+            folder,
+            vec![Entry {
+                name: "beleg.pdf".into(),
+                kind: EntryKind::File,
+                size: None,
+                modified: None,
+            }],
+        );
+        browser.activate(folder); // browse into it, then check an ancestor
+        browser.toggle(NodeId::ROOT);
+        assert_eq!(
+            browser.scope_marker(),
+            Marker::Selected,
+            "inside a checked folder the select-all box is ticked"
+        );
+        browser.select_all();
+        assert_eq!(
+            browser.selected().collect::<Vec<_>>(),
+            vec![NodeId::ROOT],
+            "select-all adds nothing under a selected ancestor"
+        );
+        browser.toggle_all();
+        assert!(
+            !browser.has_selection(),
+            "the box unticks the covering ancestor"
         );
     }
 
