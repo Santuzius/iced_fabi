@@ -7,7 +7,7 @@
 //!
 //! Material-style selection on every row: a box, a tick when the item is selected as a unit, and a dot when something inside it is selected ([`Marker`]); the header's box selects or clears the whole list. The listings themselves come from the application: the widget only says which nodes need loading ([`Outcome::NeedsLoad`]), the app answers with [`Browser::set_children`] — from disk, rclone, or an HTTP API.
 //!
-//! The widget is configured through the [`Cabinet`] builder: toolbar [`Tool`]s in groups ([`Cabinet::tool_separator`] between them, besides the built-in mode switch), custom [`Column`]s (registered on the [`Browser`]), a [`Style`] hook so an app's own theme (its palette, or a fork's) drives every colour, and a [`RowIcons`] hook for the file/folder glyphs (its own icon pack, tinted or multicolour).
+//! The widget is configured through the [`Cabinet`] builder: toolbar [`Tool`]s in groups ([`Cabinet::tool_separator`] between them, besides the built-in mode switch), a text [`action_button`](Cabinet::action_button) for the selection, custom [`Column`]s (registered on the [`Browser`]), a [`Style`] hook so an app's own theme (its palette, or a fork's) drives every colour, and a [`RowIcons`] hook for the file/folder glyphs (its own icon pack, tinted or multicolour).
 //!
 //! ```no_run
 //! use iced_fabi::{Browser, Event, file_cabinet};
@@ -34,7 +34,9 @@ use std::rc::Rc;
 
 use iced_widget::{
     Space, button, column, container,
-    core::{Alignment, Background, Color, Element, Font, Length, Pixels, Theme, border, font},
+    core::{
+        Alignment, Background, Border, Color, Element, Font, Length, Pixels, Theme, border, font,
+    },
     row, scrollable, text,
 };
 
@@ -128,6 +130,10 @@ pub struct Style {
     pub muted: Color,
     /// Selected markers and the sort column's arrow.
     pub accent: Color,
+    /// Text on accent-filled surfaces (the action button's label).
+    pub on_accent: Color,
+    /// Hover variant of [`accent`](Self::accent) (the action button under the pointer).
+    pub accent_hover: Color,
     /// Tint of the folder glyphs of tinted icon packs.
     pub folder: Color,
     /// Row background while selected.
@@ -172,6 +178,16 @@ pub fn default_style(theme: &Theme) -> Style {
             ..palette.text
         },
         accent: palette.primary,
+        on_accent: if 0.299 * palette.primary.r
+            + 0.587 * palette.primary.g
+            + 0.114 * palette.primary.b
+            < 0.5
+        {
+            Color::WHITE
+        } else {
+            Color::BLACK
+        },
+        accent_hover: mix(palette.primary, palette.text, 0.12),
         folder: mix(palette.primary, palette.background, 0.3),
         selection,
         row_hover: Color {
@@ -319,6 +335,24 @@ type Colour<'a> = Rc<dyn Fn(&Theme) -> Color + 'a>;
 /// A scrollbar style function as [`Cabinet::scrollbar`] stores it.
 type ScrollbarStyle<'a> = Rc<dyn Fn(&Theme, scrollable::Status) -> scrollable::Style + 'a>;
 
+/// Where the [`Cabinet::action_button`] goes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum ActionPlacement {
+    /// Wide and centred below the row list.
+    #[default]
+    WideCenter,
+    /// Floating over the rows in the cabinet's bottom-right corner.
+    Floating,
+    /// As the last item of the toolbar, before the mode switch.
+    ToolbarEnd,
+}
+
+/// The cabinet's one action button; see [`Cabinet::action_button`].
+struct Action<Message> {
+    text: String,
+    on_press: Message,
+}
+
 /// The file cabinet as a builder: call [`cabinet`] (or [`file_cabinet`] for the defaults) and configure toolbar and colours before [`build`](Self::build)ing.
 pub struct Cabinet<'a, Message: Clone, Renderer> {
     browser: &'a Browser,
@@ -326,6 +360,8 @@ pub struct Cabinet<'a, Message: Clone, Renderer> {
     tools: Vec<ToolbarItem<'a, Message>>,
     mode_toggle: bool,
     checkboxes: bool,
+    action: Option<Action<Message>>,
+    action_placement: ActionPlacement,
     style: Rc<dyn Fn(&Theme) -> Style + 'a>,
     icons: &'a dyn RowIcons,
     separators: Separators,
@@ -349,6 +385,8 @@ where
         tools: Vec::new(),
         mode_toggle: true,
         checkboxes: true,
+        action: None,
+        action_placement: ActionPlacement::default(),
         style: Rc::new(default_style),
         icons: &TablerIcons,
         separators: Separators::default(),
@@ -405,6 +443,21 @@ where
         self
     }
 
+    /// The cabinet's one text button for the app's main action (download, share, delete, …): it is clickable while at least one entry is selected and otherwise grey like an inactive tool; `on_press` is sent on a click and what follows is the application's business. Where it sits: see [`action_placement`](Self::action_placement).
+    pub fn action_button(mut self, text: impl Into<String>, on_press: Message) -> Self {
+        self.action = Some(Action {
+            text: text.into(),
+            on_press,
+        });
+        self
+    }
+
+    /// Where the [`action_button`](Self::action_button) goes; ignored without one. Default: [`ActionPlacement::WideCenter`].
+    pub fn action_placement(mut self, placement: ActionPlacement) -> Self {
+        self.action_placement = placement;
+        self
+    }
+
     /// Colours for this cabinet, resolved per frame from the current theme — pass a function that maps the theme (including a fork's custom palettes) to your [`Style`].
     pub fn style(mut self, style: impl Fn(&Theme) -> Style + 'a) -> Self {
         self.style = Rc::new(style);
@@ -457,14 +510,41 @@ where
                 .direction(*direction)
                 .style(move |theme, status| style(theme, status));
         }
-        column![
+        // The floating action button hovers over the row list: stacked onto the list itself, its padding measures equal distances from the list's right and bottom edges.
+        let list: Element<'a, Message, Theme, Renderer> = match &self.action {
+            Some(action) if self.action_placement == ActionPlacement::Floating => {
+                iced_widget::stack![
+                    list,
+                    container(self.action_button_element(action, ActionPlacement::Floating))
+                        .width(Length::Fill)
+                        .height(Length::Fill)
+                        .align_x(Alignment::End)
+                        .align_y(Alignment::End)
+                        .padding(16)
+                ]
+                .into()
+            }
+            _ => list.into(),
+        };
+        let mut body = column![
             self.toolbar(),
             self.hrule(),
             self.column_header(),
             self.hrule(),
             list
-        ]
-        .into()
+        ];
+        if let Some(action) = self
+            .action
+            .as_ref()
+            .filter(|_| self.action_placement == ActionPlacement::WideCenter)
+        {
+            body = body.push(
+                container(self.action_button_element(action, ActionPlacement::WideCenter))
+                    .width(Length::Fill)
+                    .padding([8.0, EDGE]),
+            );
+        }
+        body.into()
     }
 
     // --- styling helpers ---
@@ -540,6 +620,49 @@ where
         )
         .padding(0)
         .style(self.flat(self.colour(field)))
+    }
+
+    /// The action button as an element, styled like Syncative's `button_primary`: an accent-filled pill with the [`on_accent`](Style::on_accent) label and a same-colour 1-px border; hover swaps in [`accent_hover`](Style::accent_hover), and pressed is the base again. Without a selection it sits greyed like an inactive tool: the fill, label and border at 50 %, 45 % and 50 % alpha, and no click. `placement` sizes it: full-width under the list, content-sized and compact in the toolbar.
+    fn action_button_element(
+        &self,
+        action: &Action<Message>,
+        placement: ActionPlacement,
+    ) -> Element<'a, Message, Theme, Renderer> {
+        let mut btn = button(self.label(action.text.clone())).padding(
+            if placement == ActionPlacement::ToolbarEnd {
+                [4.0, 6.0]
+            } else {
+                [8.0, 18.0]
+            },
+        );
+        if placement == ActionPlacement::WideCenter {
+            btn = btn.width(Length::Fill);
+        }
+        if self.browser.has_selection() {
+            btn = btn.on_press(action.on_press.clone());
+        }
+        let style = Rc::clone(&self.style);
+        btn.style(move |theme, status| {
+            let appearance = style(theme);
+            let ghost = status == button::Status::Disabled;
+            let bg = if status == button::Status::Hovered {
+                appearance.accent_hover
+            } else {
+                appearance.accent
+            };
+            let fade = |c: Color, a: f32| Color { a, ..c };
+            button::Style {
+                background: Some(Background::Color(fade(bg, if ghost { 0.5 } else { 1.0 }))),
+                text_color: fade(appearance.on_accent, if ghost { 0.45 } else { 1.0 }),
+                border: Border {
+                    width: 1.0,
+                    radius: appearance.radius.into(),
+                    color: fade(bg, if ghost { 0.5 } else { 1.0 }),
+                },
+                ..button::Style::default()
+            }
+        })
+        .into()
     }
 
     /// A 1-px rule in the [`Style::line`] colour, across.
@@ -630,12 +753,24 @@ where
                 }
             });
         }
+        let has_tools = items
+            .iter()
+            .any(|item| matches!(item, ToolbarItem::Tool(_)));
+        // The toolbar variant of the action button lands after the tool groups, before the mode switch.
+        if let Some(action) = self
+            .action
+            .as_ref()
+            .filter(|_| self.action_placement == ActionPlacement::ToolbarEnd)
+        {
+            if has_tools {
+                toolbar = toolbar.push(self.divider());
+            }
+            toolbar = toolbar.push(self.action_button_element(action, ActionPlacement::ToolbarEnd));
+        }
+        let action_end =
+            self.action_placement == ActionPlacement::ToolbarEnd && self.action.is_some();
         if self.mode_toggle {
-            if self
-                .tools
-                .iter()
-                .any(|item| matches!(item, ToolbarItem::Tool(_)))
-            {
+            if has_tools || action_end {
                 toolbar = toolbar.push(self.divider());
             }
             let mode_glyph = match self.browser.mode() {

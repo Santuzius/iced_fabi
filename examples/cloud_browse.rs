@@ -1,6 +1,6 @@
 //! A cloud directory browser without the cloud: the listings come from a fake backend that answers every request one tick late, so the `activate → NeedsLoad → set_children` round-trip and its loading states behave like a real network drive.
 //!
-//! The bar above the cabinet demos the configuration hooks with dropdowns: the [`iced::Theme`] (including a reproduction of Syncative's palette and [`iced_fabi::Style`]), the file/folder [`iced_fabi::RowIcons`] (Tabler, or the vendored multicolour Material Icon Theme), the [`iced_fabi::Separators`] grid, the zebra stripe behind every second row, the checkbox column, which entries are listed (all or folders only — file kinds are filtered code-side at init), whether the selection holds one entry or many, and how the boxes can be summoned at all (always, on long press, or never); also what happens to toolbar tools that are not currently applicable (greyed out, or hidden outright). The toolbar itself shows the [`iced_fabi::Tool`] API (copy, paste, delete — in two groups divided by [`iced_fabi::Cabinet::tool_separator`], enabled per state, and copy/paste carries whole folder subtrees); selecting is done purely through the checkboxes. The column list gets one custom [`TypeColumn`].
+//! The bar above the cabinet demos the configuration hooks with dropdowns: the [`iced::Theme`] (including a reproduction of Syncative's palette and [`iced_fabi::Style`]), the file/folder [`iced_fabi::RowIcons`] (Tabler, or the vendored multicolour Material Icon Theme), the [`iced_fabi::Separators`] grid, the zebra stripe behind every second row, the checkbox column, which entries are listed (all or folders only — file kinds are filtered code-side at init), whether the selection holds one entry or many, and how the boxes can be summoned at all (always, on long press, or never), and where the selection's action button sits (under the list, floating, or last in the toolbar); also what happens to toolbar tools that are not currently applicable (greyed out, or hidden outright). The toolbar itself shows the [`iced_fabi::Tool`] API (copy, paste, delete — in two groups divided by [`iced_fabi::Cabinet::tool_separator`], enabled per state, and copy/paste carries whole folder subtrees); selecting is done purely through the checkboxes. The column list gets one custom [`TypeColumn`].
 //!
 //! Run: `cargo run --example cloud_browse` — then switch modes with the icon in the top right, tap folders to drill down, tap the boxes to select (press and hold a row first when "Ticking" is on *hold*), and watch the parent markers turn into dots.
 
@@ -38,6 +38,7 @@ enum Message {
     Entries(EntryChoice),
     Selection(SelectionChoice),
     Ticking(TickingChoice),
+    Action(ActionChoice),
     Tick,
 }
 
@@ -186,6 +187,30 @@ const TICKING_CHOICES: &[TickingChoice] = &[
     TickingChoice::Tap,
 ];
 
+/// Where the action button triggered by a selection sits.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ActionChoice {
+    Wide,
+    Floating,
+    Toolbar,
+}
+
+impl fmt::Display for ActionChoice {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(match self {
+            Self::Wide => "under list",
+            Self::Floating => "floating",
+            Self::Toolbar => "toolbar",
+        })
+    }
+}
+
+const ACTION_CHOICES: &[ActionChoice] = &[
+    ActionChoice::Wide,
+    ActionChoice::Floating,
+    ActionChoice::Toolbar,
+];
+
 const LINES: &[iced_fabi::Separators] = &[
     iced_fabi::Separators::None,
     iced_fabi::Separators::Horizontal,
@@ -241,6 +266,8 @@ struct Tones {
     text: iced::Color,
     muted: iced::Color,
     accent: iced::Color,
+    accent_hover: iced::Color,
+    on_accent: iced::Color,
     success: iced::Color,
     warning: iced::Color,
     danger: iced::Color,
@@ -258,6 +285,8 @@ const SYNCATIVE_TONES_LIGHT: Tones = Tones {
     text: hex(0x1c1c1f),
     muted: hex(0x606368),
     accent: hex(0x2a73c5),
+    accent_hover: hex(0x2464ad),
+    on_accent: hex(0xffffff),
     success: hex(0x2a8a4f),
     warning: hex(0xb7790f),
     danger: hex(0xc4372f),
@@ -274,6 +303,8 @@ const SYNCATIVE_TONES_DARK: Tones = Tones {
     text: hex(0xe6e6e8),
     muted: hex(0xa0a2a8),
     accent: hex(0x4c9be8),
+    accent_hover: hex(0x63a9ee),
+    on_accent: hex(0x0e1520),
     success: hex(0x4cbb73),
     warning: hex(0xe3a93a),
     danger: hex(0xe5584f),
@@ -319,6 +350,8 @@ fn syncative_style(theme: &Theme) -> iced_fabi::Style {
         text: t.text,
         muted: t.muted,
         accent: t.accent,
+        on_accent: t.on_accent,
+        accent_hover: t.accent_hover,
         selection: t.selection,
         folder: t.folder,
         row_hover: iced::Color {
@@ -637,6 +670,7 @@ struct App {
     entries: EntryChoice,
     selection: SelectionChoice,
     ticking: TickingChoice,
+    action: ActionChoice,
 }
 
 impl App {
@@ -661,6 +695,7 @@ impl App {
             entries: EntryChoice::All,
             selection: SelectionChoice::Multiple,
             ticking: TickingChoice::Tap,
+            action: ActionChoice::Wide,
         };
         let task = Task::done(app.accept(outcome));
         (app, task)
@@ -736,6 +771,10 @@ impl App {
                     TickingChoice::Hold => iced_fabi::SelectionUi::LongPress,
                     TickingChoice::Tap => iced_fabi::SelectionUi::Select,
                 });
+                Task::none()
+            }
+            Message::Action(choice) => {
+                self.action = choice;
                 Task::none()
             }
             Message::Copy => {
@@ -958,6 +997,14 @@ impl App {
                     100.0,
                     syncative
                 ),
+                label("Action"),
+                dropdown(
+                    ACTION_CHOICES,
+                    &self.action,
+                    Message::Action,
+                    120.0,
+                    syncative
+                ),
             ]
             .spacing(8)
             .align_y(iced::Alignment::Center),
@@ -1013,6 +1060,16 @@ impl App {
             cabinet = cabinet.tool(
                 tool(icondata::TbTrashOutline, |_| Message::Delete).when(move |_| has_selection),
             );
+        }
+        // The selection's action button: text and message are the app's, placement is picked in the bar.
+        if show(has_selection) {
+            cabinet = cabinet
+                .action_button("Delete selected", Message::Delete)
+                .action_placement(match self.action {
+                    ActionChoice::Wide => iced_fabi::ActionPlacement::WideCenter,
+                    ActionChoice::Floating => iced_fabi::ActionPlacement::Floating,
+                    ActionChoice::Toolbar => iced_fabi::ActionPlacement::ToolbarEnd,
+                });
         }
         if !syncative {
             return column![bar, cabinet.build()].padding(16).spacing(8).into();
