@@ -14,15 +14,7 @@ fn partial_marker_propagates_up() {
 fn selected_folder_ticks_its_loaded_children() {
     let mut browser = Browser::sample();
     let folder = NodeId::derive(NodeId::ROOT, EntryKind::Folder, "Finanzen");
-    browser.set_children(
-        folder,
-        vec![Entry {
-            name: "beleg.pdf".into(),
-            kind: EntryKind::File,
-            size: None,
-            modified: None,
-        }],
-    );
+    browser.set_children(folder, vec![Entry::file("beleg.pdf")]);
     let child = NodeId::derive(folder, EntryKind::File, "beleg.pdf");
     browser.toggle(folder);
     assert_eq!(
@@ -90,39 +82,10 @@ fn unchecking_deep_below_a_selected_folder_dissolves_along_the_chain() {
     let folder = NodeId::derive(NodeId::ROOT, EntryKind::Folder, "Finanzen");
     browser.set_children(
         folder,
-        vec![
-            Entry {
-                name: "Depot".into(),
-                kind: EntryKind::Folder,
-                size: None,
-                modified: None,
-            },
-            Entry {
-                name: "beleg.pdf".into(),
-                kind: EntryKind::File,
-                size: None,
-                modified: None,
-            },
-        ],
+        vec![Entry::folder("Depot"), Entry::file("beleg.pdf")],
     );
     let depot = NodeId::derive(folder, EntryKind::Folder, "Depot");
-    browser.set_children(
-        depot,
-        vec![
-            Entry {
-                name: "keys.txt".into(),
-                kind: EntryKind::File,
-                size: None,
-                modified: None,
-            },
-            Entry {
-                name: "pub.txt".into(),
-                kind: EntryKind::File,
-                size: None,
-                modified: None,
-            },
-        ],
-    );
+    browser.set_children(depot, vec![Entry::file("keys.txt"), Entry::file("pub.txt")]);
     let keys = NodeId::derive(depot, EntryKind::File, "keys.txt");
     let public = NodeId::derive(depot, EntryKind::File, "pub.txt");
     browser.toggle(folder);
@@ -211,15 +174,7 @@ fn toggle_all_selects_then_clears_only_inside_the_scope() {
     browser.toggle(outside);
     let folder = NodeId::derive(NodeId::ROOT, EntryKind::Folder, "Finanzen");
     let _ = browser.activate(folder);
-    browser.set_children(
-        folder,
-        vec![Entry {
-            name: "Krypto".into(),
-            kind: EntryKind::Folder,
-            size: None,
-            modified: None,
-        }],
-    );
+    browser.set_children(folder, vec![Entry::folder("Krypto")]);
     let inside = NodeId::derive(folder, EntryKind::Folder, "Krypto");
     assert_eq!(
         browser.scope_marker(),

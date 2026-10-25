@@ -644,7 +644,7 @@ type Clipboard = Vec<Copied>;
 
 struct App {
     browser: Browser,
-    /// The "cloud": path → listing. The root's key is "My files".
+    /// The "cloud": path → listing. The root's key is "" (paths below the root, as `path_below_root` gives them).
     cloud: HashMap<String, Vec<Entry>>,
     pending: Vec<Pending>,
     clipboard: Clipboard,
@@ -725,10 +725,9 @@ impl App {
                     .browser
                     .selected()
                     .filter_map(|id| {
-                        let chain = self.browser.name_chain(id);
-                        let (parent, name) = chain.split_at(chain.len() - 1);
-                        let name = (*name.first()?).to_string();
-                        let parent = parent.join("/");
+                        let below = self.browser.path_below_root(id);
+                        let name = (*below.last()?).to_string();
+                        let parent = below[..below.len() - 1].join("/");
                         let entry = self
                             .cloud
                             .get(&parent)?
@@ -743,7 +742,10 @@ impl App {
                 Task::none()
             }
             Message::Paste => {
-                let key = self.browser.name_chain(self.browser.current()).join("/");
+                let key = self
+                    .browser
+                    .path_below_root(self.browser.current())
+                    .join("/");
                 let mut listing = self.cloud.get(&key).cloned().unwrap_or_default();
                 for copied in self.clipboard.clone() {
                     let mut top = copied;
@@ -760,12 +762,14 @@ impl App {
             Message::Delete => {
                 // Drop the selected entries from the fake cloud (with their subtrees) and from the browser; a real backend would get the delete call instead.
                 for id in self.browser.selected().collect::<Vec<_>>() {
-                    let chain = self.browser.name_chain(id);
-                    let path = chain.join("/");
+                    let path = self.browser.path_below_root(id).join("/");
                     delete_paths(&mut self.cloud, &path);
                 }
                 self.browser.remove_selected();
-                let key = self.browser.name_chain(self.browser.current()).join("/");
+                let key = self
+                    .browser
+                    .path_below_root(self.browser.current())
+                    .join("/");
                 let listing = self.cloud.get(&key).cloned().unwrap_or_default();
                 self.browser.set_children(self.browser.current(), listing);
                 Task::none()
@@ -816,7 +820,7 @@ impl App {
     fn accept(&mut self, outcome: Outcome) -> Message {
         match outcome {
             Outcome::NeedsLoad(id) => {
-                let path = self.browser.name_chain(id).join("/");
+                let path = self.browser.path_below_root(id).join("/");
                 self.pending.push(Pending {
                     node: id,
                     path,
@@ -1077,7 +1081,12 @@ fn extension(name: &str) -> Option<&str> {
 /// Recursively snapshot an entry with its subtree out of the fake cloud; a real backend would fetch these listings on demand instead.
 fn snapshot(cloud: &HashMap<String, Vec<Entry>>, parent: &str, entry: &Entry) -> Copied {
     let children = if matches!(entry.kind, EntryKind::Folder) {
-        let path = format!("{parent}/{}", entry.name);
+        // Same join as the fake cloud's keys: the root's parent path is "", so no leading slash.
+        let path = if parent.is_empty() {
+            entry.name.clone()
+        } else {
+            format!("{parent}/{}", entry.name)
+        };
         cloud
             .get(&path)
             .map(|listing| {
@@ -1122,8 +1131,12 @@ fn delete_paths(cloud: &mut HashMap<String, Vec<Entry>>, path: &str) {
         cloud.remove(&key);
     }
     match path.rsplit_once('/') {
-        // A top-level path is the root scope: it itself stays (the browser refuses to delete it), only its subtree keys go.
-        None => {}
+        // A path without a slash sits in the root scope (whose key is ""); the root scope itself stays (the browser refuses to delete it), only its subtree keys go.
+        None => {
+            if let Some(listing) = cloud.get_mut("") {
+                listing.retain(|entry| entry.name != path);
+            }
+        }
         Some((parent, name)) => {
             if let Some(listing) = cloud.get_mut(parent) {
                 listing.retain(|entry| entry.name != name);
@@ -1162,23 +1175,14 @@ fn with_extension(stem: &str, extension: Option<&str>) -> String {
 
 /// The fake drive: three levels deep, with the folder/file names and sizes modelled on Material Files' screenshots; the Projekte folder adds the file kinds beyond that model to show more of the Material icon set.
 fn fake_cloud() -> HashMap<String, Vec<Entry>> {
-    let file = |name: &str, size: u64, modified: i64| Entry {
-        name: name.into(),
-        kind: EntryKind::File,
-        size: Some(size),
-        modified: Some(modified),
-    };
-    let folder = |name: &str, modified: i64| Entry {
-        name: name.into(),
-        kind: EntryKind::Folder,
-        size: None,
-        modified: Some(modified),
-    };
+    let file =
+        |name: &str, size: u64, modified: i64| Entry::file(name).size(size).modified(modified);
+    let folder = |name: &str, modified: i64| Entry::folder(name).modified(modified);
     let day: i64 = 86_400;
     let base = 1_745_000_000; // spring 2025.
     HashMap::from([
         (
-            "My files".into(),
+            "".into(),
             vec![
                 folder("Finanzen", base),
                 folder("Dokumente", base + day),
@@ -1187,7 +1191,7 @@ fn fake_cloud() -> HashMap<String, Vec<Entry>> {
             ],
         ),
         (
-            "My files/Projekte".into(),
+            "Projekte".into(),
             vec![
                 file("main.rs", 4_096, base),
                 file("main.go", 2_048, base + 2 * day),
@@ -1204,7 +1208,7 @@ fn fake_cloud() -> HashMap<String, Vec<Entry>> {
             ],
         ),
         (
-            "My files/Finanzen".into(),
+            "Finanzen".into(),
             vec![
                 folder("Krypto", base + 3 * day),
                 file("Steuer 2024.pdf", 1_204_000, base),
@@ -1212,7 +1216,7 @@ fn fake_cloud() -> HashMap<String, Vec<Entry>> {
             ],
         ),
         (
-            "My files/Finanzen/Krypto".into(),
+            "Finanzen/Krypto".into(),
             vec![
                 file(
                     "Risikoinformationen_BWWB_Digital_Exchange.pdf",
@@ -1229,14 +1233,14 @@ fn fake_cloud() -> HashMap<String, Vec<Entry>> {
             ],
         ),
         (
-            "My files/Dokumente".into(),
+            "Dokumente".into(),
             vec![
                 folder("Verträge", base + day),
                 file("Scheck.pdf", 90_120, base + day),
             ],
         ),
         (
-            "My files/Dokumente/Verträge".into(),
+            "Dokumente/Verträge".into(),
             vec![
                 file("Miete.pdf", 240_000, base - 30 * day),
                 file("Strom.pdf", 180_500, base - 12 * day),

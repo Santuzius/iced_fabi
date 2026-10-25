@@ -48,6 +48,7 @@ impl Browser {
         for entry in entries {
             let child_id = NodeId::derive(id, entry.kind, &entry.name);
             let node = self.nodes.entry(child_id).or_insert(Node {
+                id: child_id,
                 name: entry.name.clone(),
                 kind: entry.kind,
                 parent: Some(id),

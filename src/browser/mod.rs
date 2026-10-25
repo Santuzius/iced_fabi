@@ -85,6 +85,7 @@ impl Browser {
     pub fn new(root: impl Into<String>) -> Self {
         let root_name = root.into();
         let node = Node {
+            id: NodeId::ROOT,
             name: root_name,
             kind: EntryKind::Folder,
             parent: None,
@@ -174,18 +175,8 @@ impl Browser {
         browser.set_children(
             NodeId::ROOT,
             vec![
-                Entry {
-                    name: "Finanzen".into(),
-                    kind: EntryKind::Folder,
-                    size: None,
-                    modified: Some(1_745_000_000),
-                },
-                Entry {
-                    name: "notes.txt".into(),
-                    kind: EntryKind::File,
-                    size: Some(900),
-                    modified: Some(1_745_000_100),
-                },
+                Entry::folder("Finanzen").modified(1_745_000_000),
+                Entry::file("notes.txt").size(900).modified(1_745_000_100),
             ],
         );
         browser

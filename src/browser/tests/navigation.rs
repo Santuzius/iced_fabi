@@ -1,5 +1,4 @@
-use crate::browser::Browser;
-use crate::browser::{Entry, EntryKind, NodeId, Outcome};
+use crate::browser::{Browser, Entry, EntryKind, NodeId, Outcome};
 
 #[test]
 fn activate_walks_path_and_loads_once() {
@@ -24,6 +23,23 @@ fn activate_walks_path_and_loads_once() {
     );
     let krypto = NodeId::derive(folder, EntryKind::Folder, "Krypto");
     assert_eq!(browser.activate(krypto), Outcome::NeedsLoad(krypto));
+}
+
+#[test]
+fn path_below_root_skips_the_root_display_name() {
+    let mut browser = Browser::sample();
+    let folder = NodeId::derive(NodeId::ROOT, EntryKind::Folder, "Finanzen");
+    let _ = browser.activate(folder);
+    assert_eq!(
+        browser.name_chain(folder),
+        vec!["My files", "Finanzen"],
+        "name_chain keeps the display name for the title"
+    );
+    assert_eq!(browser.path_below_root(folder), vec!["Finanzen"]);
+    assert!(
+        browser.path_below_root(NodeId::ROOT).is_empty(),
+        "the root scope is the empty backend path"
+    );
 }
 
 #[test]

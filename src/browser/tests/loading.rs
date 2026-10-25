@@ -6,15 +6,7 @@ fn pruning_removes_selections_of_gone_entries() {
     let mut browser = Browser::sample();
     let file = NodeId::derive(NodeId::ROOT, EntryKind::File, "notes.txt");
     browser.toggle(file);
-    browser.set_children(
-        NodeId::ROOT,
-        vec![Entry {
-            name: "Finanzen".into(),
-            kind: EntryKind::Folder,
-            size: None,
-            modified: None,
-        }],
-    );
+    browser.set_children(NodeId::ROOT, vec![Entry::folder("Finanzen")]);
     assert!(!browser.has_selection());
     assert!(!browser.nodes.contains_key(&file));
 }
@@ -24,15 +16,7 @@ fn remove_selected_deletes_and_prunes() {
     let mut browser = Browser::sample();
     let folder = NodeId::derive(NodeId::ROOT, EntryKind::Folder, "Finanzen");
     let _ = browser.activate(folder);
-    browser.set_children(
-        folder,
-        vec![Entry {
-            name: "Krypto".into(),
-            kind: EntryKind::Folder,
-            size: None,
-            modified: None,
-        }],
-    );
+    browser.set_children(folder, vec![Entry::folder("Krypto")]);
     let krypto = NodeId::derive(folder, EntryKind::Folder, "Krypto");
     let file = NodeId::derive(NodeId::ROOT, EntryKind::File, "notes.txt");
     let _ = browser.goto(krypto);
@@ -64,15 +48,7 @@ fn remove_drops_nested_ids_once_and_refuses_the_root() {
     let mut browser = Browser::sample();
     let folder = NodeId::derive(NodeId::ROOT, EntryKind::Folder, "Finanzen");
     let _ = browser.activate(folder);
-    browser.set_children(
-        folder,
-        vec![Entry {
-            name: "Krypto".into(),
-            kind: EntryKind::Folder,
-            size: None,
-            modified: None,
-        }],
-    );
+    browser.set_children(folder, vec![Entry::folder("Krypto")]);
     let krypto = NodeId::derive(folder, EntryKind::Folder, "Krypto");
     browser.toggle(krypto);
     // Both ids at once: the nested one must not need splicing out on its own.

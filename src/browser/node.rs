@@ -43,8 +43,9 @@ pub enum EntryKind {
     File,
 }
 
-/// One listing entry handed to [`set_children`](crate::Browser::set_children). The display strings for `size` and `modified` are produced by the browser's formatters, so the app only passes raw values.
+/// One listing entry handed to [`set_children`](crate::Browser::set_children). The display strings for `size` and `modified` are produced by the browser's formatters, so the app only passes raw values. Build one with [`folder`](Self::folder) / [`file`](Self::file) and their `.size()` / `.modified()`.
 #[derive(Debug, Clone)]
+#[non_exhaustive]
 pub struct Entry {
     pub name: String,
     pub kind: EntryKind,
@@ -54,9 +55,44 @@ pub struct Entry {
     pub modified: Option<i64>,
 }
 
-/// A node the browser knows about, filled by [`set_children`](crate::Browser::set_children).
+impl Entry {
+    /// A folder entry; only `name` is required.
+    pub fn folder(name: impl Into<String>) -> Self {
+        Self {
+            name: name.into(),
+            kind: EntryKind::Folder,
+            size: None,
+            modified: None,
+        }
+    }
+
+    /// A file entry; only `name` is required.
+    pub fn file(name: impl Into<String>) -> Self {
+        Self {
+            name: name.into(),
+            kind: EntryKind::File,
+            size: None,
+            modified: None,
+        }
+    }
+
+    pub fn size(mut self, bytes: u64) -> Self {
+        self.size = Some(bytes);
+        self
+    }
+
+    pub fn modified(mut self, seconds_since_epoch: i64) -> Self {
+        self.modified = Some(seconds_since_epoch);
+        self
+    }
+}
+
+/// A node the browser knows about, filled by [`set_children`](crate::Browser::set_children). Read-only for apps: the browser keeps it current.
 #[derive(Debug, Clone)]
+#[non_exhaustive]
 pub struct Node {
+    /// This node's identity, derived once at creation from the parent's id, kind and name — unlike a re-derivation, the root's id is [`NodeId::ROOT`] this way.
+    pub id: NodeId,
     pub name: String,
     pub kind: EntryKind,
     pub parent: Option<NodeId>,
@@ -70,13 +106,6 @@ pub struct Node {
     pub failed: bool,
     pub size: Option<u64>,
     pub modified: Option<i64>,
-}
-
-/// The id a node carries: derived from its parent, kind and name (the same function [`NodeId::derive`] uses when listing).
-impl Node {
-    pub(super) fn id(&self) -> NodeId {
-        NodeId::derive(self.parent.unwrap_or(NodeId::ROOT), self.kind, &self.name)
-    }
 }
 
 /// Whether `id` is a proper descendant of `below` (walking parents, so it stays correct as the tree is rebuilt). Shared by the selection and removal logic.

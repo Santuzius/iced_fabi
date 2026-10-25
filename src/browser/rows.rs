@@ -149,6 +149,6 @@ impl Browser {
             // Equal keys (and unsortable columns) fall back to name so the order is stable.
             ordered.then_with(|| name_key(&a.name).cmp(&name_key(&b.name)))
         });
-        nodes.iter().map(|node| node.id()).collect()
+        nodes.iter().map(|node| node.id).collect()
     }
 }

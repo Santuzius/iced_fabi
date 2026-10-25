@@ -49,6 +49,12 @@ impl Browser {
         chain
     }
 
+    /// The names from the root's children down to `id` — the path a backend expects, without the root's display name (the root itself gives an empty path). Same order as [`name_chain`](Self::name_chain) minus its first element, so the two joined with `/` are the backend key.
+    pub fn path_below_root(&self, id: NodeId) -> Vec<&str> {
+        let all = self.name_chain(id);
+        all[1..].to_vec()
+    }
+
     pub fn is_expanded(&self, id: NodeId) -> bool {
         self.expanded.contains(&id)
     }

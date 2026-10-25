@@ -65,24 +65,9 @@ fn custom_column_sorts() {
     browser.set_children(
         NodeId::ROOT,
         vec![
-            Entry {
-                name: "a.pdf".into(),
-                kind: EntryKind::File,
-                size: None,
-                modified: None,
-            },
-            Entry {
-                name: "b.txt".into(),
-                kind: EntryKind::File,
-                size: None,
-                modified: None,
-            },
-            Entry {
-                name: "c.pdf".into(),
-                kind: EntryKind::File,
-                size: None,
-                modified: None,
-            },
+            Entry::file("a.pdf"),
+            Entry::file("b.txt"),
+            Entry::file("c.pdf"),
         ],
     );
     browser.sort_by_column(extension);
