@@ -82,7 +82,6 @@ pub struct Cabinet<'a, Message: Clone, Renderer> {
     pub(super) on_event: &'a dyn Fn(crate::Event) -> Message,
     pub(super) tools: Vec<ToolbarItem<'a, Message>>,
     pub(super) mode_toggle: bool,
-    pub(super) checkboxes: bool,
     pub(super) action: Option<Action<Message>>,
     pub(super) action_placement: ActionPlacement,
     pub(super) style: Rc<dyn Fn(&Theme) -> Style + 'a>,
@@ -107,7 +106,6 @@ where
         on_event,
         tools: Vec::new(),
         mode_toggle: true,
-        checkboxes: true,
         action: None,
         action_placement: ActionPlacement::default(),
         style: Rc::new(default_style),
@@ -160,10 +158,9 @@ where
         self
     }
 
-    /// Show or hide the selection-box column (the header box and the box on every row). With it off the rows keep the space where the boxes sat, so they still align with the columns; selection state is only visible through row backgrounds and the selection count. Default: on.
-    pub fn checkboxes(mut self, yes: bool) -> Self {
-        self.checkboxes = yes;
-        self
+    /// Whether a selection box column goes on the rows and the header right now: the browser's [`boxes_visible`](Browser::boxes_visible) — the [`Selection`](crate::Selection) allows it and the [`Checkboxes`](crate::Checkboxes) setting says it is visible now (in [`OnLongPress`](crate::Checkboxes::OnLongPress) only once a row has been held long enough).
+    pub(super) fn boxes_shown(&self) -> bool {
+        self.browser.boxes_visible()
     }
 
     /// The cabinet's one text button for the app's main action (download, share, delete, …): it is clickable while at least one entry is selected and otherwise grey like an inactive tool; `on_press` is sent on a click and what follows is the application's business. It is a pill with completely round corners; where it sits: see [`action_placement`](Self::action_placement).
@@ -268,10 +265,5 @@ where
             );
         }
         body.into()
-    }
-
-    /// Whether a selection box column goes on the rows and the header right now: the [`checkboxes`](Cabinet::checkboxes) column setting and the browser's [`boxes_visible`](Browser::boxes_visible) (which in [`LongPress`](crate::SelectionUi::LongPress) flips on once a row has been held long enough) both have to allow it.
-    pub(super) fn boxes_shown(&self) -> bool {
-        self.checkboxes && self.browser.boxes_visible()
     }
 }

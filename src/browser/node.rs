@@ -111,26 +111,28 @@ pub enum Mode {
     Tree,
 }
 
-/// How many entries the selection can hold at once.
+/// How many entries the selection can hold — and whether it can hold any at all. Orthogonal to [`Checkboxes`] (where the boxes are); the default is [`Multiple`](Self::Multiple).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub enum SelectionMode {
+pub enum Selection {
     /// As many units as the user likes, across levels.
     #[default]
     Multiple,
     /// At most one entry: a new tick replaces whatever was selected.
     Single,
+    /// No selection at all: a pure file view. The boxes never appear, ticking does nothing, and tapping a file reports [`Outcome::FileOpened`](crate::Outcome::FileOpened).
+    None,
 }
 
-/// How selection can happen at all — the widget's mode.
+/// How the selection boxes appear — orthogonal to [`Selection`] (how many can be picked); the default is [`Shown`](Self::Shown).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub enum SelectionUi {
-    /// No selection at all: a pure file view. The boxes never appear and [`toggle`](crate::Browser::toggle) does nothing; tapping a file reports [`Outcome::FileOpened`](crate::Outcome::FileOpened) like in tree mode.
-    ViewOnly,
-    /// Selection, but the boxes are hidden until a row is pressed and held for at least [`LONG_PRESS`](super::long_press::LONG_PRESS): the hold arms the selection, the boxes appear on every row and the held row itself is ticked; this stays until the app calls [`disarm`](crate::Browser::disarm). While unarmed, taps keep their normal meaning (folders navigate, files report [`Outcome::FileOpened`](crate::Outcome::FileOpened)).
-    LongPress,
-    /// Normal: a box sits on every row and taps tick.
+pub enum Checkboxes {
+    /// A box sits on every row and on the header.
     #[default]
-    Select,
+    Shown,
+    /// The rows start without boxes: pressing and holding a row for at least [`LONG_PRESS`](super::long_press::LONG_PRESS) reveals them on every row and ticks the held row itself — until the app calls [`disarm`](crate::Browser::disarm) or sets this setting again. While hidden, a row press keeps its normal meaning (folders navigate, files tick only under a [`Selection`] other than [`None`](Selection::None), which then happens invisibly).
+    OnLongPress,
+    /// The box column stays hidden — the selection lives on, visible only through row backgrounds and the header's count line.
+    Hidden,
 }
 
 #[cfg(test)]

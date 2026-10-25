@@ -199,10 +199,7 @@ where
             })
             .on_press((self.on_event)(crate::Event::RowPressed(row.id)))
             .into();
-        if self.checkboxes
-            && self.browser.selection_ui() == crate::SelectionUi::LongPress
-            && !self.browser.is_armed()
-        {
+        if self.browser.checkboxes() == crate::Checkboxes::OnLongPress && !self.browser.is_armed() {
             // While the boxes are hidden, a transparent layer on top of the row records press and release.
             // Stack children are handled top-down, so `HoldEnded` reaches the app before the row's own
             // activation — and `Browser::hold_ended` then swallows that activation for a revealing hold.

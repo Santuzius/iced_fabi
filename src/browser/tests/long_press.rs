@@ -1,10 +1,9 @@
-use crate::browser::Browser;
-use crate::browser::{EntryKind, NodeId, long_press::LONG_PRESS};
+use crate::browser::{Browser, Checkboxes, EntryKind, NodeId, long_press::LONG_PRESS};
 
 #[test]
 fn long_press_reveals_boxes_and_short_presses_do_not() {
     let mut browser = Browser::sample();
-    browser.set_selection_ui(crate::SelectionUi::LongPress);
+    browser.set_checkboxes(Checkboxes::OnLongPress);
     let notes = NodeId::derive(NodeId::ROOT, EntryKind::File, "notes.txt");
     assert!(!browser.boxes_visible(), "unarmed: no boxes");
     browser.hold_started(notes);

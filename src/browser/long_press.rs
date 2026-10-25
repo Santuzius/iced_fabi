@@ -1,8 +1,8 @@
-//! Long press in the [`LongPress`](crate::SelectionUi::LongPress) mode: the hold that arms the selection and reveals the boxes.
+//! Long press in the [`OnLongPress`](crate::Checkboxes::OnLongPress) mode: the hold that arms the selection and reveals the boxes.
 
 use super::{Browser, NodeId};
 
-/// How long a row must be held in [`LongPress`](crate::SelectionUi::LongPress) to reveal the boxes.
+/// How long a row must be held in [`OnLongPress`](crate::Checkboxes::OnLongPress) to reveal the boxes.
 pub const LONG_PRESS: std::time::Duration = std::time::Duration::from_millis(500);
 
 impl Browser {
@@ -17,7 +17,7 @@ impl Browser {
         self.held = None;
     }
 
-    /// A row's press began ([`LongPress`](crate::SelectionUi::LongPress) wiring): remember which row and when.
+    /// A row's press began ([`OnLongPress`](crate::Checkboxes::OnLongPress) wiring): remember which row and when.
     pub fn hold_started(&mut self, id: NodeId) {
         self.held = Some((id, std::time::Instant::now()));
     }

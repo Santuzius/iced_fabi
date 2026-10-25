@@ -14,9 +14,9 @@
 //! [`Browser`] holds the state that persists across frames — what the app wants to show and how selection behaves:
 //!
 //! - Content: [`set_mode`](Browser::set_mode) (browse or tree), [`set_folders_only`](Browser::set_folders_only), [`set_file_extensions`](Browser::set_file_extensions) / [`show_all_files`](Browser::show_all_files), custom [`add_column`](Browser::add_column)s, and the listings themselves via [`set_children`](Browser::set_children).
-//! - Selection: [`set_selection_mode`](Browser::set_selection_mode) (one entry at a time or many), [`set_selection_ui`](Browser::set_selection_ui) (view-only, long-press-to-reveal, or the normal boxes), and the operations [`tap`](Browser::tap), [`toggle`](Browser::toggle), [`toggle_all`](Browser::toggle_all), [`clear_selection`](Browser::clear_selection), [`remove_selected`](Browser::remove_selected).
+//! - Selection: [`set_selection`](Browser::set_selection) (many entries, one, or none at all), [`set_checkboxes`](Browser::set_checkboxes) (always shown, revealed by a long press, or hidden), and the operations [`tap`](Browser::tap), [`toggle`](Browser::toggle), [`toggle_all`](Browser::toggle_all), [`clear_selection`](Browser::clear_selection), [`remove_selected`](Browser::remove_selected).
 //!
-//! [`Cabinet`] is rebuilt on every draw from [`cabinet`] and carries the look of that one draw: the [`checkboxes`](Cabinet::checkboxes) column, the toolbar [`tool`](Cabinet::tool)s, the [`action_button`](Cabinet::action_button) and where it sits ([`action_placement`](Cabinet::action_placement)), [`separators`](Cabinet::separators), [`style`](Cabinet::style), [`icons`](Cabinet::icons), [`text_size`](Cabinet::text_size), [`font`](Cabinet::font) and [`scrollbar`](Cabinet::scrollbar).
+//! [`Cabinet`] is rebuilt on every draw from [`cabinet`] and carries the look of that one draw: the selection settings ([`crate::Selection`] and [`crate::Checkboxes`]) on the [`Browser`], the toolbar [`tool`](Cabinet::tool)s, the [`action_button`](Cabinet::action_button) and where it sits ([`action_placement`](Cabinet::action_placement)), [`separators`](Cabinet::separators), [`style`](Cabinet::style), [`icons`](Cabinet::icons), [`text_size`](Cabinet::text_size), [`font`](Cabinet::font) and [`scrollbar`](Cabinet::scrollbar).
 //!
 //! The widget talks to the app in two directions only: it emits [`Event`]s — hand each one to [`Browser::update`] in your `update`, and the returned [`Outcome`] says what to do next (fetch, open, or nothing) — and it receives listings via [`set_children`](Browser::set_children). Start-up: after configuring the browser, call [`open`](Browser::open) and act on its [`Outcome::NeedsLoad`] before the first draw.
 //!
@@ -41,8 +41,8 @@ mod style;
 mod tool;
 
 pub use browser::{
-    Browser, Entry, EntryKind, FormatModified, FormatSize, LONG_PRESS, Marker, Mode, Node, NodeId,
-    Outcome, SelectionMode, SelectionUi,
+    Browser, Checkboxes, Entry, EntryKind, FormatModified, FormatSize, LONG_PRESS, Marker, Mode,
+    Node, NodeId, Outcome, Selection,
 };
 pub use cabinet::{ActionPlacement, Cabinet, Separators, cabinet, file_cabinet};
 pub use column::{Cell, Column, ColumnWidth, ModifiedColumn, NameColumn, SizeColumn};

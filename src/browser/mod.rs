@@ -15,7 +15,7 @@ mod selection;
 mod tests;
 
 pub use long_press::LONG_PRESS;
-pub use node::{Entry, EntryKind, Marker, Mode, Node, NodeId, SelectionMode, SelectionUi};
+pub use node::{Checkboxes, Entry, EntryKind, Marker, Mode, Node, NodeId, Selection};
 
 use std::collections::{HashMap, HashSet};
 
@@ -57,13 +57,13 @@ pub struct Browser {
     pub(super) expanded: HashSet<NodeId>,
     /// Explicit unit selections; a node selected here is not selected again below it, and [`toggle`](Self::toggle) refuses to select under a selected ancestor.
     pub(super) selected: HashSet<NodeId>,
-    /// Whether the boxes accumulate or replace.
-    pub(super) selection_mode: SelectionMode,
-    /// Whether and how selection can happen at all.
-    pub(super) selection_ui: SelectionUi,
+    /// How many entries can be selected at once (or none at all).
+    pub(super) selection: Selection,
+    /// How the selection boxes appear.
+    pub(super) checkboxes: Checkboxes,
     /// Long-press bookkeeping: the row currently held and when the hold started.
     pub(super) held: Option<(NodeId, std::time::Instant)>,
-    /// Whether a long press has revealed the boxes ([`LongPress`](SelectionUi::LongPress)).
+    /// Whether a long press has revealed the boxes ([`OnLongPress`](crate::Checkboxes::OnLongPress)).
     pub(super) armed: bool,
     /// Index into [`columns`](Self::columns); index 0 is the built-in [`NameColumn`].
     pub(super) sort_column: usize,
@@ -101,8 +101,8 @@ impl Browser {
             current: NodeId::ROOT,
             expanded: HashSet::from([NodeId::ROOT]),
             selected: HashSet::new(),
-            selection_mode: SelectionMode::Multiple,
-            selection_ui: SelectionUi::Select,
+            selection: Selection::Multiple,
+            checkboxes: Checkboxes::Shown,
             held: None,
             armed: false,
             sort_column: 0,

@@ -1,7 +1,6 @@
 //! Navigation: entering folders (browse and tree), breadcrumbs, mode, and the queries about where the view stands.
 
-use super::{Browser, Node, NodeId, Outcome, node::EntryKind};
-use crate::browser::Mode;
+use super::{Browser, Checkboxes, Mode, Node, NodeId, Outcome, Selection, node::EntryKind};
 
 impl Browser {
     pub fn mode(&self) -> Mode {
@@ -102,13 +101,15 @@ impl Browser {
         }
     }
 
-    /// Click on a row's name in browse mode: folders navigate, files report activation. While the boxes are hidden ([`ViewOnly`](crate::SelectionUi::ViewOnly) always, [`LongPress`](crate::SelectionUi::LongPress) until armed) files only report activation — they are not ticked.
+    /// Click on a row's name in browse mode: folders navigate, files report activation. A file ticks silently whenever a [`Selection`] other than [`None`](Selection::None) is possible and the boxes are not merely waiting for a revealing long press — so [`Hidden`](Checkboxes::Hidden) still ticks on tap (the boxes are presentation, not permission), while [`OnLongPress`](Checkboxes::OnLongPress) leaves a press unarmed the row keeps its normal meaning ([`FileOpened`](Outcome::FileOpened)).
     pub fn tap(&mut self, id: NodeId) -> Outcome {
         let file = self
             .nodes
             .get(&id)
             .is_some_and(|node| node.kind == EntryKind::File);
-        if file && self.mode == Mode::Browse && self.boxes_visible() {
+        let ticks = self.selection != Selection::None
+            && (self.checkboxes != Checkboxes::OnLongPress || self.armed);
+        if file && self.mode == Mode::Browse && ticks {
             // Material-style: without a separate open action a file tap selects it.
             self.toggle(id);
             return Outcome::None;

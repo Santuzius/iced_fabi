@@ -1,8 +1,8 @@
 //! A cloud directory browser without the cloud: the listings come from a fake backend that answers every request one tick late, so the `activate → NeedsLoad → set_children` round-trip and its loading states behave like a real network drive.
 //!
-//! The bar above the cabinet demos the configuration hooks with dropdowns: the [`iced::Theme`] (including a reproduction of Syncative's palette and [`iced_fabi::Style`]), the file/folder [`iced_fabi::RowIcons`] (Tabler, or the vendored multicolour Material Icon Theme), the [`iced_fabi::Separators`] grid, the zebra stripe behind every second row, the checkbox column, which entries are listed (all or folders only — file kinds are filtered code-side at init), whether the selection holds one entry or many, and how the boxes can be summoned at all (always, on long press, or never), and where the selection's action button sits (under the list, floating, or last in the toolbar); also what happens to toolbar tools that are not currently applicable (greyed out, or hidden outright). The toolbar itself shows the [`iced_fabi::Tool`] API (copy, paste, delete — in two groups divided by [`iced_fabi::Cabinet::tool_separator`], enabled per state, and copy/paste carries whole folder subtrees); selecting is done purely through the checkboxes. The column list gets one custom [`TypeColumn`].
+//! The bar above the cabinet demos the configuration hooks with dropdowns: the [`iced::Theme`] (including a reproduction of Syncative's palette and [`iced_fabi::Style`]), the file/folder [`iced_fabi::RowIcons`] (Tabler, or the vendored multicolour Material Icon Theme), the [`iced_fabi::Separators`] grid, the zebra stripe behind every second row, which entries are listed (all or folders only — file kinds are filtered code-side at init), how many entries the selection holds (many, one, or none), how the boxes appear (always, on long press, or hidden), and where the selection's action button sits (under the list, floating, or last in the toolbar); also what happens to toolbar tools that are not currently applicable (greyed out, or hidden outright). The toolbar itself shows the [`iced_fabi::Tool`] API (copy, paste, delete — in two groups divided by [`iced_fabi::Cabinet::tool_separator`], enabled per state, and copy/paste carries whole folder subtrees); selecting is done purely through the checkboxes. The column list gets one custom [`TypeColumn`].
 //!
-//! Run: `cargo run --example cloud_browse` — then switch modes with the icon in the top right, tap folders to drill down, tap the boxes to select (press and hold a row first when "Ticking" is on *hold*), and watch the parent markers turn into dots.
+//! Run: `cargo run --example cloud_browse` — then switch modes with the icon in the top right, tap folders to drill down, tap the boxes to select (press and hold a row first when "Boxes" is on *on long press*), and watch the parent markers turn into dots.
 
 use std::{collections::HashMap, fmt, sync::LazyLock, time::Duration};
 
@@ -34,10 +34,9 @@ enum Message {
     Inactive(InactiveChoice),
     Lines(iced_fabi::Separators),
     Zebra(ZebraChoice),
-    Checkboxes(CheckboxChoice),
+    Boxes(BoxesChoice),
     Entries(EntryChoice),
     Selection(SelectionChoice),
-    Ticking(TickingChoice),
     Action(ActionChoice),
     Tick,
 }
@@ -109,23 +108,29 @@ impl fmt::Display for InactiveChoice {
 
 const INACTIVE_CHOICES: &[InactiveChoice] = &[InactiveChoice::GreyedOut, InactiveChoice::Hidden];
 
-/// Whether the cabinet shows its selection-box column.
+/// How the selection boxes appear (the [`iced_fabi::Checkboxes`] setting).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum CheckboxChoice {
-    On,
-    Off,
+enum BoxesChoice {
+    Shown,
+    OnLongPress,
+    Hidden,
 }
 
-impl fmt::Display for CheckboxChoice {
+impl fmt::Display for BoxesChoice {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(match self {
-            Self::On => "on",
-            Self::Off => "off",
+            Self::Shown => "shown",
+            Self::OnLongPress => "on long press",
+            Self::Hidden => "hidden",
         })
     }
 }
 
-const CHECKBOX_CHOICES: &[CheckboxChoice] = &[CheckboxChoice::On, CheckboxChoice::Off];
+const BOXES_CHOICES: &[BoxesChoice] = &[
+    BoxesChoice::Shown,
+    BoxesChoice::OnLongPress,
+    BoxesChoice::Hidden,
+];
 
 /// Which kinds of entries the lists show.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -145,11 +150,12 @@ impl fmt::Display for EntryChoice {
 
 const ENTRY_CHOICES: &[EntryChoice] = &[EntryChoice::All, EntryChoice::FoldersOnly];
 
-/// How many entries the selection can hold.
+/// How many entries the selection can hold (the [`iced_fabi::Selection`] setting).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum SelectionChoice {
     Multiple,
     Single,
+    None,
 }
 
 impl fmt::Display for SelectionChoice {
@@ -157,34 +163,15 @@ impl fmt::Display for SelectionChoice {
         f.write_str(match self {
             Self::Multiple => "multiple",
             Self::Single => "single",
+            Self::None => "none (view)",
         })
     }
 }
 
-const SELECTION_CHOICES: &[SelectionChoice] = &[SelectionChoice::Multiple, SelectionChoice::Single];
-
-/// Whether and how the widget lets you tick entries at all.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum TickingChoice {
-    Never,
-    Hold,
-    Tap,
-}
-
-impl fmt::Display for TickingChoice {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(match self {
-            Self::Never => "never",
-            Self::Hold => "hold",
-            Self::Tap => "tap",
-        })
-    }
-}
-
-const TICKING_CHOICES: &[TickingChoice] = &[
-    TickingChoice::Never,
-    TickingChoice::Hold,
-    TickingChoice::Tap,
+const SELECTION_CHOICES: &[SelectionChoice] = &[
+    SelectionChoice::Multiple,
+    SelectionChoice::Single,
+    SelectionChoice::None,
 ];
 
 /// Where the action button triggered by a selection sits.
@@ -666,10 +653,9 @@ struct App {
     inactive: InactiveChoice,
     lines: iced_fabi::Separators,
     zebra: ZebraChoice,
-    checkboxes: CheckboxChoice,
+    boxes: BoxesChoice,
     entries: EntryChoice,
     selection: SelectionChoice,
-    ticking: TickingChoice,
     action: ActionChoice,
 }
 
@@ -691,10 +677,9 @@ impl App {
             inactive: InactiveChoice::GreyedOut,
             lines: iced_fabi::Separators::Both,
             zebra: ZebraChoice::Off,
-            checkboxes: CheckboxChoice::On,
+            boxes: BoxesChoice::Shown,
             entries: EntryChoice::All,
             selection: SelectionChoice::Multiple,
-            ticking: TickingChoice::Tap,
             action: ActionChoice::Wide,
         };
         let task = Task::done(app.accept(outcome));
@@ -707,8 +692,13 @@ impl App {
                 let outcome = self.browser.update(event);
                 Task::done(self.accept(outcome))
             }
-            Message::Checkboxes(choice) => {
-                self.checkboxes = choice;
+            Message::Boxes(choice) => {
+                self.boxes = choice;
+                self.browser.set_checkboxes(match choice {
+                    BoxesChoice::Shown => iced_fabi::Checkboxes::Shown,
+                    BoxesChoice::OnLongPress => iced_fabi::Checkboxes::OnLongPress,
+                    BoxesChoice::Hidden => iced_fabi::Checkboxes::Hidden,
+                });
                 Task::none()
             }
             Message::Entries(choice) => {
@@ -719,18 +709,10 @@ impl App {
             }
             Message::Selection(choice) => {
                 self.selection = choice;
-                self.browser.set_selection_mode(match choice {
-                    SelectionChoice::Multiple => iced_fabi::SelectionMode::Multiple,
-                    SelectionChoice::Single => iced_fabi::SelectionMode::Single,
-                });
-                Task::none()
-            }
-            Message::Ticking(choice) => {
-                self.ticking = choice;
-                self.browser.set_selection_ui(match choice {
-                    TickingChoice::Never => iced_fabi::SelectionUi::ViewOnly,
-                    TickingChoice::Hold => iced_fabi::SelectionUi::LongPress,
-                    TickingChoice::Tap => iced_fabi::SelectionUi::Select,
+                self.browser.set_selection(match choice {
+                    SelectionChoice::Multiple => iced_fabi::Selection::Multiple,
+                    SelectionChoice::Single => iced_fabi::Selection::Single,
+                    SelectionChoice::None => iced_fabi::Selection::None,
                 });
                 Task::none()
             }
@@ -926,14 +908,6 @@ impl App {
             iced::widget::row![
                 label("Zebra"),
                 dropdown(ZEBRA, &self.zebra, Message::Zebra, 100.0, syncative),
-                label("Checkboxes"),
-                dropdown(
-                    CHECKBOX_CHOICES,
-                    &self.checkboxes,
-                    Message::Checkboxes,
-                    90.0,
-                    syncative
-                ),
                 label("Entries"),
                 dropdown(
                     ENTRY_CHOICES,
@@ -950,14 +924,8 @@ impl App {
                     110.0,
                     syncative
                 ),
-                label("Ticking"),
-                dropdown(
-                    TICKING_CHOICES,
-                    &self.ticking,
-                    Message::Ticking,
-                    100.0,
-                    syncative
-                ),
+                label("Boxes"),
+                dropdown(BOXES_CHOICES, &self.boxes, Message::Boxes, 120.0, syncative),
                 label("Action"),
                 dropdown(
                     ACTION_CHOICES,
@@ -997,7 +965,6 @@ impl App {
             .style(style)
             .icons(icons)
             .separators(self.lines)
-            .checkboxes(self.checkboxes == CheckboxChoice::On)
             // The app's default_font is Noto Sans under every theme (see `main`), so the cabinet labels with it too; without it its semibold breadcrumb and "N selected" fall back to iced's default family.
             .font(SYNCATIVE_FONT);
         if syncative {

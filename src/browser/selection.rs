@@ -1,46 +1,50 @@
 //! Material-style unit selection: ticking, the select-all box, markers, and the rules about covered entries.
 
-use super::{Browser, NodeId, SelectionMode, SelectionUi};
+use super::{Browser, Checkboxes, NodeId, Selection};
 use crate::Marker;
 
 impl Browser {
-    pub fn selection_mode(&self) -> SelectionMode {
-        self.selection_mode
+    pub fn selection(&self) -> Selection {
+        self.selection
     }
 
-    pub fn selection_ui(&self) -> SelectionUi {
-        self.selection_ui
+    pub fn checkboxes(&self) -> Checkboxes {
+        self.checkboxes
     }
 
-    /// Set the widget mode; switching to [`ViewOnly`](SelectionUi::ViewOnly) drops any existing selection, and switching modes always re-hides a revealed long-press box column. Default: [`Select`](SelectionUi::Select).
-    pub fn set_selection_ui(&mut self, ui: SelectionUi) {
-        self.selection_ui = ui;
+    /// How many entries can be selected at once — or none at all. Entering [`None`](Selection::None) drops any existing selection; the others keep it. Default: [`Multiple`](Selection::Multiple).
+    pub fn set_selection(&mut self, selection: Selection) {
+        self.selection = selection;
+        match selection {
+            Selection::None => self.selected.clear(),
+            Selection::Single => {
+                // Keep at most one unit: the first explicit one wins, the rest go.
+                let first = self.selected.iter().next().copied();
+                self.selected.clear();
+                if let Some(id) = first {
+                    self.selected.insert(id);
+                }
+            }
+            Selection::Multiple => {}
+        }
+    }
+
+    /// How the selection boxes appear. Setting it always re-hides a column revealed by a long press. Default: [`Shown`](Checkboxes::Shown).
+    pub fn set_checkboxes(&mut self, boxes: Checkboxes) {
+        self.checkboxes = boxes;
         self.held = None;
         self.armed = false;
-        if ui == SelectionUi::ViewOnly {
-            self.selected.clear();
-        }
     }
 
-    /// Whether the selection boxes should be drawn right now: always in [`Select`](SelectionUi::Select), only after a revealing long press in [`LongPress`](SelectionUi::LongPress), never in [`ViewOnly`](SelectionUi::ViewOnly). (The cabinet's own checkbox column setting can still hide the column; the widget combines both.)
+    /// Whether the selection boxes should be drawn right now: no with [`Selection::None`](Selection::None) (a pure view has no boxes whatever [`Checkboxes`] says), otherwise per the [`Checkboxes`](Checkboxes) setting — always in [`Shown`](Checkboxes::Shown), only after a revealing long press in [`OnLongPress`](Checkboxes::OnLongPress), never in [`Hidden`](Checkboxes::Hidden).
     pub fn boxes_visible(&self) -> bool {
-        match self.selection_ui {
-            SelectionUi::ViewOnly => false,
-            SelectionUi::LongPress => self.armed,
-            SelectionUi::Select => true,
+        if self.selection == Selection::None {
+            return false;
         }
-    }
-
-    /// `Single` makes every box replace the selection: at most one entry is ever ticked; the header's select-all then ticks the scope itself as that one unit, and unticking a covered entry clears the whole (only) selection.
-    pub fn set_selection_mode(&mut self, mode: SelectionMode) {
-        self.selection_mode = mode;
-        if mode == SelectionMode::Single {
-            // Keep at most one unit: the first explicit one wins, the rest go.
-            let first = self.selected.iter().next().copied();
-            self.selected.clear();
-            if let Some(id) = first {
-                self.selected.insert(id);
-            }
+        match self.checkboxes {
+            Checkboxes::Shown => true,
+            Checkboxes::OnLongPress => self.armed,
+            Checkboxes::Hidden => false,
         }
     }
 
@@ -83,10 +87,10 @@ impl Browser {
         }
     }
 
-    /// The header's select-all box clicked: select every child of the scope when nothing in it is selected, otherwise clear the selection within the scope. When the scope is only ticked because an ancestor is selected, that unticks the ancestor — the same rule as for a covered row's box, see [`toggle`](Self::toggle). In [`SelectionMode::Single`] the box instead toggles the scope itself as the one unit.
+    /// The header's select-all box clicked: select every child of the scope when nothing in it is selected, otherwise clear the selection within the scope. When the scope is only ticked because an ancestor is selected, that unticks the ancestor — the same rule as for a covered row's box, see [`toggle`](Self::toggle). In [`Selection::Single`] the box instead toggles the scope itself as the one unit.
     pub fn toggle_all(&mut self) {
         let scope = self.scope();
-        if self.selection_mode == SelectionMode::Single {
+        if self.selection == Selection::Single {
             let on = self.selected.contains(&scope) || self.selected_ancestor(scope).is_some();
             self.selected.clear();
             if !on {
@@ -113,13 +117,13 @@ impl Browser {
         }
     }
 
-    /// Select every child of the scope node — the current directory in browse mode, the root in tree mode — provided it is listed. Does nothing while the scope itself or one of its ancestors is selected (the children are already covered). In [`SelectionMode::Single`] this selects the scope itself as the one unit.
+    /// Select every child of the scope node — the current directory in browse mode, the root in tree mode — provided it is listed. Does nothing while the scope itself or one of its ancestors is selected (the children are already covered). In [`Selection::Single`](Selection::Single) this selects the scope itself as the one unit.
     pub fn select_all(&mut self) {
         let scope = self.scope();
         if self.selected.contains(&scope) || self.selected_ancestor(scope).is_some() {
             return;
         }
-        if self.selection_mode == SelectionMode::Single {
+        if self.selection == Selection::Single {
             self.selected.clear();
             self.selected.insert(scope);
             return;
@@ -160,14 +164,14 @@ impl Browser {
             .any(|child| self.selected.contains(child) || self.has_selected_below(*child))
     }
 
-    /// Toggle the unit selection of a node. In [`ViewOnly`](SelectionUi::ViewOnly) this does nothing.
+    /// Toggle the unit selection of a node. With [`Selection::None`](Selection::None) this does nothing.
     ///
-    /// Rules (Material-inspired): a node under a selected ancestor shows a tick because the ancestor's unit covers it, and clicking its box removes just that entry from the selection — the sibling rows stay ticked and the ancestors become dots (the unit is dissolved along the chain from the ancestor down); selecting a folder that had explicit selections below clears them, because the folder now stands for its whole subtree. In [`SelectionMode::Single`] any tap first clears everything: tapping the (possibly covered) entry that reads ticked leaves nothing selected, tapping another makes it the one selection.
+    /// Rules (Material-inspired): a node under a selected ancestor shows a tick because the ancestor's unit covers it, and clicking its box removes just that entry from the selection — the sibling rows stay ticked and the ancestors become dots (the unit is dissolved along the chain from the ancestor down); selecting a folder that had explicit selections below clears them, because the folder now stands for its whole subtree. In [`Selection::Single`](Selection::Single) any tap first clears everything: tapping the (possibly covered) entry that reads ticked leaves nothing selected, tapping another makes it the one selection.
     pub fn toggle(&mut self, id: NodeId) {
-        if self.selection_ui == SelectionUi::ViewOnly || !self.nodes.contains_key(&id) {
+        if self.selection == Selection::None || !self.nodes.contains_key(&id) {
             return;
         }
-        if self.selection_mode == SelectionMode::Single {
+        if self.selection == Selection::Single {
             let on = self.selected.contains(&id) || self.selected_ancestor(id).is_some();
             self.selected.clear();
             if !on {

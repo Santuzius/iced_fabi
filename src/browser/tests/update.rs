@@ -1,6 +1,6 @@
 //! [`Browser::update`] routing: one test per [`Event`] variant, asserting the widget event lands on the right state operation and reports the right [`Outcome`].
 
-use crate::browser::{EntryKind, Event, NodeId, Outcome, SelectionUi};
+use crate::browser::{Checkboxes, EntryKind, Event, NodeId, Outcome, Selection};
 use crate::{Browser, Marker, Mode};
 
 fn into_folder(browser: &mut Browser) -> NodeId {
@@ -45,10 +45,28 @@ fn row_pressed_on_a_file_ticks_while_the_boxes_are_shown() {
 }
 
 #[test]
-fn row_pressed_on_a_file_reports_when_the_boxes_are_hidden() {
+fn row_pressed_on_a_file_ticks_silently_when_the_boxes_are_hidden() {
     let mut browser = Browser::sample();
-    browser.set_selection_ui(SelectionUi::ViewOnly);
+    browser.set_checkboxes(Checkboxes::Hidden);
     let file = NodeId::derive(NodeId::ROOT, EntryKind::File, "notes.txt");
+    assert_eq!(
+        browser.update(Event::RowPressed(file)),
+        Outcome::None,
+        "Hidden is presentation: the selection machinery still runs, just without boxes"
+    );
+    assert_eq!(browser.marker(file), Marker::Selected);
+    assert!(!browser.boxes_visible(), "and stays invisible");
+}
+
+#[test]
+fn row_pressed_on_a_file_reports_with_no_selection_possible() {
+    let mut browser = Browser::sample();
+    browser.set_selection(Selection::None);
+    let file = NodeId::derive(NodeId::ROOT, EntryKind::File, "notes.txt");
+    assert!(
+        !browser.boxes_visible(),
+        "Selection::None hides the boxes whatever Checkboxes says"
+    );
     assert_eq!(
         browser.update(Event::RowPressed(file)),
         Outcome::FileOpened(file)
@@ -152,7 +170,7 @@ fn mode_switch_pressed_flips_browse_and_tree() {
 #[test]
 fn short_press_under_long_press_reaches_the_state_only_through_hold_ended() {
     let mut browser = Browser::sample();
-    browser.set_selection_ui(SelectionUi::LongPress);
+    browser.set_checkboxes(Checkboxes::OnLongPress);
     let file = NodeId::derive(NodeId::ROOT, EntryKind::File, "notes.txt");
     let _ = browser.update(Event::HoldStarted(file));
     let outcome = browser.update(Event::HoldEnded(file));

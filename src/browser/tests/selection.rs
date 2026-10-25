@@ -245,9 +245,9 @@ fn toggle_all_selects_then_clears_only_inside_the_scope() {
 }
 
 #[test]
-fn single_mode_replaces_the_selection() {
+fn single_selection_replaces_the_selection() {
     let mut browser = Browser::sample();
-    browser.set_selection_mode(crate::SelectionMode::Single);
+    browser.set_selection(crate::Selection::Single);
     let folder = NodeId::derive(NodeId::ROOT, EntryKind::Folder, "Finanzen");
     let notes = NodeId::derive(NodeId::ROOT, EntryKind::File, "notes.txt");
     browser.toggle(folder);
@@ -275,14 +275,18 @@ fn single_mode_replaces_the_selection() {
 }
 
 #[test]
-fn view_only_mode_never_selects() {
+fn selection_none_never_selects() {
     let mut browser = Browser::sample();
     let notes = NodeId::derive(NodeId::ROOT, EntryKind::File, "notes.txt");
-    browser.set_selection_ui(crate::SelectionUi::ViewOnly);
+    browser.set_selection(crate::Selection::None);
     browser.toggle(notes);
     assert!(
         !browser.has_selection(),
         "toggles are ignored in the pure view"
+    );
+    assert!(
+        !browser.boxes_visible(),
+        "a pure view has no boxes whatever Checkboxes says"
     );
     assert_eq!(
         browser.tap(notes),
@@ -291,10 +295,10 @@ fn view_only_mode_never_selects() {
     );
     assert_eq!(browser.activate(notes), Outcome::FileOpened(notes));
     // Existing selections are dropped on the way in, and selection comes back on the way out.
-    browser.set_selection_ui(crate::SelectionUi::Select);
+    browser.set_selection(crate::Selection::Multiple);
     browser.toggle(notes);
     assert!(browser.has_selection());
-    browser.set_selection_ui(crate::SelectionUi::ViewOnly);
+    browser.set_selection(crate::Selection::None);
     assert!(
         !browser.has_selection(),
         "and switching into the view drops it"
