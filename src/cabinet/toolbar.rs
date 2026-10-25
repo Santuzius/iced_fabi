@@ -39,7 +39,7 @@ where
         + iced_widget::core::Renderer
         + 'a,
 {
-    /// Breadcrumbs with the mode switch behind a divider on the left, the tool groups on the right.
+    /// Breadcrumbs behind the mode switch and a divider on the left, the tool groups on the right.
     pub(super) fn toolbar(&self) -> Element<'a, Message, Theme, Renderer> {
         let mut crumbs = row![].spacing(2).align_y(Alignment::Center);
         // Tree mode is positionless (the rows are the position), so its breadcrumb stays at the root.
@@ -69,7 +69,7 @@ where
             );
         }
         let mut toolbar = row![].spacing(2).align_y(Alignment::Center);
-        // The mode switch belongs by the breadcrumb, divided from the tools; no divider when the bar has no tools at all.
+        // Separators only ever divide two tools: collapsed groups take their divider with them.
         let items = prune_separators(&self.tools);
         for item in &items {
             toolbar = toolbar.push(match item {
@@ -103,9 +103,8 @@ where
                 self.icon_button(mode_glyph, 18.0, 30.0, ColourField::Text)
                     .on_press((self.on_event)(crate::Event::ModeSwitchPressed)),
             );
-            if has_tools {
-                mode_switch = mode_switch.push(self.divider());
-            }
+            // The mode switch leads the bar and is divided from the breadcrumbs; the tools keep their own leading divider.
+            mode_switch = mode_switch.push(self.divider());
         }
         // The toolbar variant of the action button lands after the tool groups.
         if let Some(action) = self
@@ -119,8 +118,8 @@ where
             toolbar = toolbar.push(self.action_button_element(action, ActionPlacement::ToolbarEnd));
         }
         row![
-            crumbs,
             mode_switch,
+            crumbs,
             Space::new().width(Length::Fill),
             toolbar
         ]
