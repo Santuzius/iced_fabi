@@ -9,9 +9,7 @@ use iced_widget::{
 };
 
 use super::Cabinet;
-use super::paint::{
-    CARET, CELL_PAD, ColourField, EDGE, GAP, GLYPH, INDENT, MARKER_CELL, ROW_HEIGHT,
-};
+use super::paint::{CARET, ColourField, GAP, GLYPH, INDENT, ROW_HEIGHT};
 use crate::{
     Marker,
     browser::{EntryKind, NodeId, rows::Row},
@@ -113,16 +111,15 @@ where
             .on_press((self.on_event)(crate::Event::RetryPressed(id)))
             .into(),
         };
-        row![
-            Space::new().width(Length::Fixed(
-                (if self.boxes_shown() { MARKER_CELL } else { 0.0 }) + CELL_PAD + indent,
-            )),
-            content
-        ]
-        .height(Length::Fixed(ROW_HEIGHT))
-        .padding([0.0, EDGE])
-        .align_y(Alignment::Center)
-        .into()
+        // Through the template, so the upright rules stay solid across a status line too; only the indent is the status line's own.
+        self.template(
+            Length::Fixed(ROW_HEIGHT),
+            iced_widget::Space::new().into(),
+            row![Space::new().width(Length::Fixed(indent)), content]
+                .align_y(Alignment::Center)
+                .into(),
+            self.empty_cells(),
+        )
     }
 
     /// One list row: the whole row is a button (activate) that highlights under the pointer, with the box and the caret as buttons of their own on top.
@@ -168,6 +165,7 @@ where
             .map(|col| self.cell_content(col.cell(self.browser, node)))
             .collect();
         let content = self.template(
+            Length::Fixed(ROW_HEIGHT),
             self.marker_button(row.marker, crate::Event::MarkerPressed(row.id)),
             name.into(),
             cells,

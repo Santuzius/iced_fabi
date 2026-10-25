@@ -177,9 +177,10 @@ where
             .into()
     }
 
-    /// The row template: selection box (when the boxes are shown), the Name cell and the other columns (with optional rules between them). The header and every row go through here, so their columns always share the same boundaries.
+    /// The row template: selection box (when the boxes are shown), the Name cell and the other columns (with optional rules between them). The header and every row go through here, so their columns always share the same boundaries. With vertical separators the row is framed by upright rules at its very left and right too, so the table's edge lines are solid from the header to the last row — as overlays: a fixed-width child at the end of a filling row misplaces itself in iced's flex, while a container aligned to the edge of a stack cannot.
     pub(super) fn template(
         &self,
+        height: Length,
         marker: Element<'a, Message, Theme, Renderer>,
         name: Element<'a, Message, Theme, Renderer>,
         cells: Vec<Element<'a, Message, Theme, Renderer>>,
@@ -194,7 +195,7 @@ where
                 .clip(true)
         };
         let mut row = iced_widget::Row::new()
-            .height(Length::Fixed(ROW_HEIGHT))
+            .height(height)
             .padding([0.0, EDGE])
             .align_y(Alignment::Center);
         if self.boxes_shown() {
@@ -207,7 +208,31 @@ where
             }
             row = row.push(cell(content, columns[index + 1].width()));
         }
-        row.into()
+        if !self.separators.vertical() {
+            return row.into();
+        }
+        // The edge rules go on top as full-height overlays: a fixed child at the end of a filling row misplaces itself in iced's flex, but a container aligned to the edge of a stack cannot. The stack is as big as the row, so both rules span exactly the row's height.
+        iced_widget::stack![
+            row,
+            container(self.vrule())
+                .width(Length::Fill)
+                .height(height)
+                .align_x(Alignment::Start),
+            container(self.vrule())
+                .width(Length::Fill)
+                .height(height)
+                .align_x(Alignment::End),
+        ]
+        .width(Length::Fill)
+        .height(height)
+        .into()
+    }
+
+    /// Blank cells, one per column after the Name column — for rows that carry no data (status lines, the selection-count header) yet must still draw the column rules.
+    pub(super) fn empty_cells(&self) -> Vec<Element<'a, Message, Theme, Renderer>> {
+        (1..self.browser.columns().len())
+            .map(|_| iced_widget::Space::new().into())
+            .collect()
     }
 }
 

@@ -9,7 +9,7 @@ use iced_widget::{
 };
 
 use super::Cabinet;
-use super::paint::{CARET, CELL_PAD, ColourField, EDGE, GAP, MARKER_CELL, ROW_HEIGHT};
+use super::paint::{CARET, ColourField, GAP, ROW_HEIGHT};
 use crate::{Marker, browser::Mode};
 
 impl<'a, Message: Clone + 'a, Renderer> Cabinet<'a, Message, Renderer>
@@ -30,23 +30,13 @@ where
         let tree = self.browser.mode() == Mode::Tree;
         let content = if self.browser.has_selection() {
             let count = self.browser.selected().count();
-            let count =
-                container(self.strong((self.labels.selected)(count))).padding([0.0, CELL_PAD]);
-            match marker {
-                Some(marker) => row![
-                    container(marker).center_x(Length::Fixed(MARKER_CELL)),
-                    count
-                ]
-                .height(Length::Fixed(ROW_HEIGHT))
-                .padding([0.0, EDGE])
-                .align_y(Alignment::Center)
-                .into(),
-                None => row![count]
-                    .height(Length::Fixed(ROW_HEIGHT))
-                    .padding([0.0, EDGE])
-                    .align_y(Alignment::Center)
-                    .into(),
-            }
+            // The count row keeps the full template (marker cell, Name column, rules) so the grid does not fall apart while something is selected.
+            self.template(
+                Length::Fixed(ROW_HEIGHT),
+                marker.unwrap_or_else(|| iced_widget::Space::new().into()),
+                container(self.strong((self.labels.selected)(count))).into(),
+                self.empty_cells(),
+            )
         } else {
             let mut headers: Vec<Element<'a, Message, Theme, Renderer>> =
                 (0..self.browser.columns().len())
@@ -58,6 +48,7 @@ where
                 name = row![Space::new().width(Length::Fixed(CARET + GAP)), name].into();
             }
             self.template(
+                Length::Fixed(ROW_HEIGHT),
                 marker.unwrap_or_else(|| iced_widget::Space::new().into()),
                 name,
                 headers,
