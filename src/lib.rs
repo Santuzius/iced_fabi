@@ -25,7 +25,8 @@ mod icon;
 
 pub use browser::{
     Browser, Cell, Column, ColumnWidth, Entry, EntryKind, FormatModified, FormatSize, Marker, Mode,
-    ModifiedColumn, NameColumn, Node, NodeId, Outcome, SizeColumn, format_bytes, format_epoch,
+    ModifiedColumn, NameColumn, Node, NodeId, Outcome, SelectionMode, SizeColumn, format_bytes,
+    format_epoch,
 };
 
 use std::fmt;

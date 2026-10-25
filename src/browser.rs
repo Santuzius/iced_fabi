@@ -98,6 +98,16 @@ pub enum Mode {
     Tree,
 }
 
+/// How many entries the selection can hold at once.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum SelectionMode {
+    /// As many units as the user likes, across levels.
+    #[default]
+    Multiple,
+    /// At most one entry: a new tick replaces whatever was selected.
+    Single,
+}
+
 /// How a column asks for its share of the row width.
 #[derive(Debug, Clone, Copy)]
 pub enum ColumnWidth {
@@ -259,6 +269,8 @@ pub struct Browser {
     expanded: HashSet<NodeId>,
     /// Explicit unit selections; a node selected here is not selected again below it, and [`toggle`](Self::toggle) refuses to select under a selected ancestor.
     selected: HashSet<NodeId>,
+    /// Whether the boxes accumulate or replace.
+    selection_mode: SelectionMode,
     /// Index into [`columns`](Self::columns); index 0 is the built-in [`NameColumn`].
     sort_column: usize,
     sort_ascending: bool,
@@ -295,6 +307,7 @@ impl Browser {
             current: NodeId::ROOT,
             expanded: HashSet::from([NodeId::ROOT]),
             selected: HashSet::new(),
+            selection_mode: SelectionMode::Multiple,
             sort_column: 0,
             sort_ascending: true,
             folders_first: true,
@@ -355,6 +368,23 @@ impl Browser {
 
     pub fn mode(&self) -> Mode {
         self.mode
+    }
+
+    pub fn selection_mode(&self) -> SelectionMode {
+        self.selection_mode
+    }
+
+    /// `Single` makes every box replace the selection: at most one entry is ever ticked; the header's select-all then ticks the scope itself as that one unit, and unticking a covered entry clears the whole (only) selection.
+    pub fn set_selection_mode(&mut self, mode: SelectionMode) {
+        self.selection_mode = mode;
+        if mode == SelectionMode::Single {
+            // Keep at most one unit: the first explicit one wins, the rest go.
+            let first = self.selected.iter().next().copied();
+            self.selected.clear();
+            if let Some(id) = first {
+                self.selected.insert(id);
+            }
+        }
     }
 
     /// Switches mode; entering tree mode keeps the current node expanded.
@@ -529,9 +559,17 @@ impl Browser {
         }
     }
 
-    /// The header's select-all box clicked: select every child of the scope when nothing in it is selected, otherwise clear the selection within the scope. When the scope is only ticked because an ancestor is selected, that unticks the ancestor — the same rule as for a covered row's box, see [`toggle`](Self::toggle).
+    /// The header's select-all box clicked: select every child of the scope when nothing in it is selected, otherwise clear the selection within the scope. When the scope is only ticked because an ancestor is selected, that unticks the ancestor — the same rule as for a covered row's box, see [`toggle`](Self::toggle). In [`SelectionMode::Single`] the box instead toggles the scope itself as the one unit.
     pub fn toggle_all(&mut self) {
         let scope = self.scope();
+        if self.selection_mode == SelectionMode::Single {
+            let on = self.selected.contains(&scope) || self.selected_ancestor(scope).is_some();
+            self.selected.clear();
+            if !on {
+                self.selected.insert(scope);
+            }
+            return;
+        }
         if let Some(ancestor) = self.selected_ancestor(scope) {
             self.selected.remove(&ancestor);
             return;
@@ -551,10 +589,15 @@ impl Browser {
         }
     }
 
-    /// Select every child of the scope node — the current directory in browse mode, the root in tree mode — provided it is listed. Does nothing while the scope itself or one of its ancestors is selected (the children are already covered).
+    /// Select every child of the scope node — the current directory in browse mode, the root in tree mode — provided it is listed. Does nothing while the scope itself or one of its ancestors is selected (the children are already covered). In [`SelectionMode::Single`] this selects the scope itself as the one unit.
     pub fn select_all(&mut self) {
         let scope = self.scope();
         if self.selected.contains(&scope) || self.selected_ancestor(scope).is_some() {
+            return;
+        }
+        if self.selection_mode == SelectionMode::Single {
+            self.selected.clear();
+            self.selected.insert(scope);
             return;
         }
         let Some(node) = self.nodes.get(&scope) else {
@@ -730,9 +773,17 @@ impl Browser {
 
     /// Toggle the unit selection of a node.
     ///
-    /// Rules (Material-inspired): a node under a selected ancestor shows a tick because the ancestor's unit covers it, and clicking its box removes just that entry from the selection (see [`uncheck_below`](Self::uncheck_below)) — the sibling rows stay ticked and the ancestors become dots; selecting a folder that had explicit selections below clears them, because the folder now stands for its whole subtree.
+    /// Rules (Material-inspired): a node under a selected ancestor shows a tick because the ancestor's unit covers it, and clicking its box removes just that entry from the selection (see [`uncheck_below`](Self::uncheck_below)) — the sibling rows stay ticked and the ancestors become dots; selecting a folder that had explicit selections below clears them, because the folder now stands for its whole subtree. In [`SelectionMode::Single`] any tap first clears everything: tapping the (possibly covered) entry that reads ticked leaves nothing selected, tapping another makes it the one selection.
     pub fn toggle(&mut self, id: NodeId) {
         if !self.nodes.contains_key(&id) {
+            return;
+        }
+        if self.selection_mode == SelectionMode::Single {
+            let on = self.selected.contains(&id) || self.selected_ancestor(id).is_some();
+            self.selected.clear();
+            if !on {
+                self.selected.insert(id);
+            }
             return;
         }
         if self.selected.contains(&id) {
@@ -1481,6 +1532,36 @@ mod tests {
         assert_eq!(names(&browser.tree_rows()), vec!["My files", "Finanzen"]);
         browser.set_folders_only(false);
         assert_eq!(browser.browse_rows().len(), 2, "the file comes back");
+    }
+
+    #[test]
+    fn single_mode_replaces_the_selection() {
+        let mut browser = sample();
+        browser.set_selection_mode(SelectionMode::Single);
+        let folder = NodeId::derive(NodeId::ROOT, EntryKind::Folder, "Finanzen");
+        let notes = NodeId::derive(NodeId::ROOT, EntryKind::File, "notes.txt");
+        browser.toggle(folder);
+        browser.toggle(notes);
+        assert_eq!(
+            browser.selected().collect::<Vec<_>>(),
+            vec![notes],
+            "the second tap replaced the first"
+        );
+        browser.toggle_all();
+        assert_eq!(
+            browser.selected().collect::<Vec<_>>(),
+            vec![NodeId::ROOT],
+            "the header box ticks the scope itself as the one unit"
+        );
+        // Tapping a box covered by that unit clears it — there is no dissolving in single mode.
+        browser.toggle(notes);
+        assert!(
+            !browser.has_selection(),
+            "the covered tap unticks the only unit"
+        );
+        // Select-all under the mode selects the scope, never every child.
+        browser.select_all();
+        assert_eq!(browser.selected().collect::<Vec<_>>(), vec![NodeId::ROOT]);
     }
 
     #[test]

@@ -19,7 +19,7 @@ fn main() -> iced::Result {
         // Syncative's UI font; the default themes show it too, since iced fixes the font for the whole run.
         .default_font(SYNCATIVE_FONT)
         // Wide enough for the whole configuration bar.
-        .window_size((1720.0, 760.0))
+        .window_size((1920.0, 760.0))
         .run()
 }
 
@@ -36,6 +36,7 @@ enum Message {
     Zebra(ZebraChoice),
     Checkboxes(CheckboxChoice),
     Entries(EntryChoice),
+    Selection(SelectionChoice),
     Tick,
 }
 
@@ -141,6 +142,24 @@ impl fmt::Display for EntryChoice {
 }
 
 const ENTRY_CHOICES: &[EntryChoice] = &[EntryChoice::All, EntryChoice::FoldersOnly];
+
+/// How many entries the selection can hold.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum SelectionChoice {
+    Multiple,
+    Single,
+}
+
+impl fmt::Display for SelectionChoice {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(match self {
+            Self::Multiple => "multiple",
+            Self::Single => "single",
+        })
+    }
+}
+
+const SELECTION_CHOICES: &[SelectionChoice] = &[SelectionChoice::Multiple, SelectionChoice::Single];
 
 const LINES: &[iced_fabi::Separators] = &[
     iced_fabi::Separators::None,
@@ -591,6 +610,7 @@ struct App {
     zebra: ZebraChoice,
     checkboxes: CheckboxChoice,
     entries: EntryChoice,
+    selection: SelectionChoice,
 }
 
 impl App {
@@ -613,6 +633,7 @@ impl App {
             zebra: ZebraChoice::Off,
             checkboxes: CheckboxChoice::On,
             entries: EntryChoice::All,
+            selection: SelectionChoice::Multiple,
         };
         let task = Task::done(app.accept(outcome));
         (app, task)
@@ -657,6 +678,14 @@ impl App {
                 self.entries = choice;
                 self.browser
                     .set_folders_only(choice == EntryChoice::FoldersOnly);
+                Task::none()
+            }
+            Message::Selection(choice) => {
+                self.selection = choice;
+                self.browser.set_selection_mode(match choice {
+                    SelectionChoice::Multiple => iced_fabi::SelectionMode::Multiple,
+                    SelectionChoice::Single => iced_fabi::SelectionMode::Single,
+                });
                 Task::none()
             }
             Message::Copy => {
@@ -857,6 +886,14 @@ impl App {
                 &self.entries,
                 Message::Entries,
                 140.0,
+                syncative
+            ),
+            label("Selection"),
+            dropdown(
+                SELECTION_CHOICES,
+                &self.selection,
+                Message::Selection,
+                110.0,
                 syncative
             ),
         ]
