@@ -19,7 +19,7 @@ fn main() -> iced::Result {
         // Syncative's UI font; the default themes show it too, since iced fixes the font for the whole run.
         .default_font(SYNCATIVE_FONT)
         // Wide enough for the whole configuration bar.
-        .window_size((1320.0, 760.0))
+        .window_size((1460.0, 760.0))
         .run()
 }
 
@@ -36,6 +36,7 @@ enum Message {
     Inactive(InactiveChoice),
     Lines(iced_fabi::Separators),
     Zebra(ZebraChoice),
+    Checkboxes(CheckboxChoice),
     Tick,
 }
 
@@ -105,6 +106,24 @@ impl fmt::Display for InactiveChoice {
 }
 
 const INACTIVE_CHOICES: &[InactiveChoice] = &[InactiveChoice::GreyedOut, InactiveChoice::Hidden];
+
+/// Whether the cabinet shows its selection-box column.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum CheckboxChoice {
+    On,
+    Off,
+}
+
+impl fmt::Display for CheckboxChoice {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(match self {
+            Self::On => "on",
+            Self::Off => "off",
+        })
+    }
+}
+
+const CHECKBOX_CHOICES: &[CheckboxChoice] = &[CheckboxChoice::On, CheckboxChoice::Off];
 
 const LINES: &[iced_fabi::Separators] = &[
     iced_fabi::Separators::None,
@@ -553,6 +572,7 @@ struct App {
     inactive: InactiveChoice,
     lines: iced_fabi::Separators,
     zebra: ZebraChoice,
+    checkboxes: CheckboxChoice,
 }
 
 impl App {
@@ -571,6 +591,7 @@ impl App {
             inactive: InactiveChoice::GreyedOut,
             lines: iced_fabi::Separators::Both,
             zebra: ZebraChoice::Off,
+            checkboxes: CheckboxChoice::On,
         };
         let task = Task::done(app.accept(outcome));
         (app, task)
@@ -613,6 +634,10 @@ impl App {
             }
             Message::DeselectAll => {
                 self.browser.clear_selection();
+                Task::none()
+            }
+            Message::Checkboxes(choice) => {
+                self.checkboxes = choice;
                 Task::none()
             }
             Message::Copy => {
@@ -799,6 +824,14 @@ impl App {
             dropdown(LINES, &self.lines, Message::Lines, 120.0, syncative),
             label("Zebra"),
             dropdown(ZEBRA, &self.zebra, Message::Zebra, 100.0, syncative),
+            label("Checkboxes"),
+            dropdown(
+                CHECKBOX_CHOICES,
+                &self.checkboxes,
+                Message::Checkboxes,
+                90.0,
+                syncative
+            ),
         ]
         .spacing(8)
         .align_y(iced::Alignment::Center);
@@ -828,6 +861,7 @@ impl App {
             .style(style)
             .icons(icons)
             .separators(self.lines)
+            .checkboxes(self.checkboxes == CheckboxChoice::On)
             // The app's default_font is Noto Sans under every theme (see `main`), so the cabinet labels with it too; without it its semibold breadcrumb and "N selected" fall back to iced's default family.
             .font(SYNCATIVE_FONT);
         if syncative {

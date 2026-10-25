@@ -320,6 +320,7 @@ pub struct Cabinet<'a, Message: Clone, Renderer> {
     on_event: &'a dyn Fn(Event) -> Message,
     tools: Vec<ToolbarItem<'a, Message>>,
     mode_toggle: bool,
+    checkboxes: bool,
     style: Rc<dyn Fn(&Theme) -> Style + 'a>,
     icons: &'a dyn RowIcons,
     separators: Separators,
@@ -342,6 +343,7 @@ where
         on_event,
         tools: Vec::new(),
         mode_toggle: true,
+        checkboxes: true,
         style: Rc::new(default_style),
         icons: &TablerIcons,
         separators: Separators::default(),
@@ -389,6 +391,12 @@ where
     /// Show or hide the built-in browse/tree switch button.
     pub fn show_mode_toggle(mut self, yes: bool) -> Self {
         self.mode_toggle = yes;
+        self
+    }
+
+    /// Show or hide the selection-box column (the header box and the box on every row). With it off the rows keep the space where the boxes sat, so they still align with the columns; selection state is only visible through row backgrounds and the "N selected" count. Default: on.
+    pub fn checkboxes(mut self, yes: bool) -> Self {
+        self.checkboxes = yes;
         self
     }
 
@@ -650,7 +658,7 @@ where
             .into()
     }
 
-    /// The row template: selection box, the Name cell and the other columns (with optional rules between them). The header and every row go through here, so their columns always share the same boundaries.
+    /// The row template: selection box (when [`Cabinet::checkboxes`] is on), the Name cell and the other columns (with optional rules between them). The header and every row go through here, so their columns always share the same boundaries.
     fn template(
         &self,
         marker: Element<'a, Message, Theme, Renderer>,
@@ -669,9 +677,11 @@ where
         let mut row = iced_widget::Row::new()
             .height(Length::Fixed(ROW_HEIGHT))
             .padding([0.0, EDGE])
-            .align_y(Alignment::Center)
-            .push(container(marker).center_x(Length::Fixed(MARKER_CELL)))
-            .push(cell(name, columns[0].width()));
+            .align_y(Alignment::Center);
+        if self.checkboxes {
+            row = row.push(container(marker).center_x(Length::Fixed(MARKER_CELL)));
+        }
+        row = row.push(cell(name, columns[0].width()));
         for (index, content) in cells.into_iter().enumerate() {
             if self.separators.vertical() {
                 row = row.push(self.vrule());
@@ -683,18 +693,29 @@ where
 
     /// The select-all box and the sort headers — or, while something is selected, the selection count.
     fn column_header(&self) -> Element<'a, Message, Theme, Renderer> {
-        let marker = self.marker_button(self.browser.scope_marker(), Event::ToggleAll);
+        let marker = self
+            .checkboxes
+            .then(|| self.marker_button(self.browser.scope_marker(), Event::ToggleAll));
         let tree = self.browser.mode() == Mode::Tree;
         let content = if self.browser.has_selection() {
             let count = self.browser.selected().count();
-            row![
-                container(marker).center_x(Length::Fixed(MARKER_CELL)),
-                container(self.strong(format!("{count} selected"))).padding([0.0, CELL_PAD]),
-            ]
-            .height(Length::Fixed(ROW_HEIGHT))
-            .padding([0.0, EDGE])
-            .align_y(Alignment::Center)
-            .into()
+            let count =
+                container(self.strong(format!("{count} selected"))).padding([0.0, CELL_PAD]);
+            match marker {
+                Some(marker) => row![
+                    container(marker).center_x(Length::Fixed(MARKER_CELL)),
+                    count
+                ]
+                .height(Length::Fixed(ROW_HEIGHT))
+                .padding([0.0, EDGE])
+                .align_y(Alignment::Center)
+                .into(),
+                None => row![count]
+                    .height(Length::Fixed(ROW_HEIGHT))
+                    .padding([0.0, EDGE])
+                    .align_y(Alignment::Center)
+                    .into(),
+            }
         } else {
             let mut headers: Vec<Element<'a, Message, Theme, Renderer>> =
                 (0..self.browser.columns().len())
@@ -705,7 +726,11 @@ where
                 // In tree mode the label starts where the top level's glyphs do, behind the caret slot.
                 name = row![Space::new().width(Length::Fixed(CARET + GAP)), name].into();
             }
-            self.template(marker, name, headers)
+            self.template(
+                marker.unwrap_or_else(|| iced_widget::Space::new().into()),
+                name,
+                headers,
+            )
         };
         let style = Rc::clone(&self.style);
         container(content)
@@ -849,7 +874,9 @@ where
             .into(),
         };
         row![
-            Space::new().width(Length::Fixed(MARKER_CELL + CELL_PAD + indent)),
+            Space::new().width(Length::Fixed(
+                (if self.checkboxes { MARKER_CELL } else { 0.0 }) + CELL_PAD + indent,
+            )),
             content
         ]
         .height(Length::Fixed(ROW_HEIGHT))
