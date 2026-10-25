@@ -46,6 +46,6 @@ Run the demo (a fake cloud drive that answers listings one tick late; its bar sw
 cargo run --example cloud_browse
 ```
 
-Icons: [Tabler Icons](https://tabler.io/icons) (MIT) via [`icondata`](https://crates.io/crates/icondata). The demo also carries a cut of the [Material Icon Theme](https://github.com/material-extensions/vscode-material-icon-theme) (MIT, © Material Extensions, v5.39.0) under `examples/assets/material-icon-theme/` with the upstream license text; provenance in [NOTICE](NOTICE).
+Icons: [Tabler Icons](https://tabler.io/icons) (MIT) and the three selection checkboxes from [IcoMoon Free](https://github.com/Keyamoon/IcoMoon-Free) (GPL-3.0-or-later, © Keyamoon) via [`icondata`](https://crates.io/crates/icondata). The demo also carries a cut of the [Material Icon Theme](https://github.com/material-extensions/vscode-material-icon-theme) (MIT, © Material Extensions, v5.39.0) under `examples/assets/material-icon-theme/` with the upstream license text; provenance in [NOTICE](NOTICE).
 
 License: MIT.
