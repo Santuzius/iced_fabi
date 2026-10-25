@@ -25,7 +25,7 @@ pub struct Style {
     pub header: Color,
     /// Separator lines: under the toolbar and the header, and the optional row and column [`Separators`](crate::Separators).
     pub line: Color,
-    /// Zebra striping: every second row's background shifts this much (0 = off, 1 = a full step of grey) away from [`background`](Self::background) — darker on dark backgrounds, lighter on light ones.
+    /// Zebra striping: every second row's background darkens by this fraction of its own colour (0 = off, 1 = black); one factor therefore reads equally subtle on dark and light backgrounds. Only a near-black background lightens its rows instead.
     pub stripe: f32,
     /// What the cabinet sits on, the base of the zebra stripe. The theme background by default, your card or panel colour when the cabinet is placed on one.
     pub background: Color,

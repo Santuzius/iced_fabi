@@ -14,7 +14,7 @@ One crate, two halves: the state (`browser/`) and the widget (`cabinet/`), plus 
   - `tests/` — one file per topic module; the shared root listing is `Browser::sample`.
 - `src/cabinet/` — the [`Cabinet`](crate::Cabinet) widget, rebuilt per frame:
   - `mod.rs` — the struct, builder setters (all settings in one place), `build`, and `Separators`.
-  - `paint.rs` — geometry constants, the `ColourField` colour selector, flat-button and rule helpers, and the column `template` header and rows share.
+  - `paint.rs` — geometry constants, the `ColourField` colour selector, flat-button and rule helpers, and the column `template` header and rows share. With vertical separators the template also draws the table's left and right edge rules as stack overlays (a fixed child at the end of a filling row misplaces itself in iced's flex); zebra stripes darken the row by a fraction of its own colour (`stripe_of`), which keeps them visible on light and dark backgrounds alike.
   - `toolbar.rs` — breadcrumbs, mode switch, tool groups; the separator-collapsing rule is a pure `prune_separators` with its own tests.
   - `header.rs` — the select-all box, sort buttons, selection count.
   - `list.rs` — browse/tree lists, one row, status lines, cells.

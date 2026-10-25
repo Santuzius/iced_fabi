@@ -236,12 +236,12 @@ where
     }
 }
 
-/// The zebra background for one background colour at the given [`Style::stripe`] factor: a step towards black (dark backgrounds) or white (light ones).
+/// The zebra background for one background colour at the given [`Style::stripe`] factor: the row darkens by this fraction of its own colour — proportional, so one factor reads with equal strength on dark and on light backgrounds. Only a background so dark that it has no room left to darken shifts towards white instead.
 pub(super) fn stripe_of(background: Color, stripe: f32) -> Color {
-    let towards = if (background.r + background.g + background.b) / 3.0 < 0.5 {
-        Color::BLACK
-    } else {
+    let towards = if (background.r + background.g + background.b) / 3.0 < 0.12 {
         Color::WHITE
+    } else {
+        Color::BLACK
     };
     crate::style::mix(background, towards, stripe)
 }
@@ -251,5 +251,35 @@ fn length(width: ColumnWidth) -> Length {
         ColumnWidth::Fill => Length::Fill,
         ColumnWidth::Portion(portion) => Length::FillPortion(portion),
         ColumnWidth::Fixed(pixels) => Length::Fixed(pixels),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::stripe_of;
+    use iced_widget::core::Color;
+
+    /// The bug this prevents: stripes mixed towards white vanished on light backgrounds.
+    #[test]
+    fn stripes_stay_visible_on_light_and_dark_backgrounds() {
+        let white = Color::from_rgb(1.0, 1.0, 1.0);
+        let light = stripe_of(white, 0.12);
+        assert!(
+            light.r < 1.0 && light.g < 1.0 && light.b < 1.0,
+            "light stripes must darken"
+        );
+
+        let dark = Color::from_rgb(0.16, 0.17, 0.18);
+        let darker = stripe_of(dark, 0.12);
+        assert!(
+            darker.r < dark.r && darker.g < dark.g && darker.b < dark.b,
+            "dark stripes keep darkening as they always did"
+        );
+
+        let near_black = Color::from_rgb(0.02, 0.02, 0.02);
+        assert!(
+            stripe_of(near_black, 0.12).r > near_black.r,
+            "a near-black background must lighten its rows instead"
+        );
     }
 }
