@@ -41,10 +41,10 @@ mod style;
 mod tool;
 
 pub use browser::{
-    Browser, Checkboxes, Entry, EntryKind, FormatModified, FormatSize, LONG_PRESS, Marker, Mode,
-    Node, NodeId, Outcome, Selection,
+    Browser, Checkboxes, Entry, EntryKind, LONG_PRESS, Marker, Mode, Node, NodeId, Outcome,
+    Selection,
 };
-pub use cabinet::{ActionPlacement, Cabinet, Separators, cabinet, file_cabinet};
+pub use cabinet::{ActionPlacement, Cabinet, Labels, Separators, cabinet, file_cabinet};
 pub use column::{Cell, Column, ColumnWidth, ModifiedColumn, NameColumn, SizeColumn};
 pub use event::Event;
 pub use format::{format_bytes, format_epoch};

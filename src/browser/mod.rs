@@ -22,7 +22,6 @@ use std::collections::{HashMap, HashSet};
 use crate::{
     column::{Column, ModifiedColumn, NameColumn, SizeColumn},
     event::Event,
-    format::{format_bytes, format_epoch},
 };
 
 /// The consequence of a [`Browser`] action, telling the application what it must do next.
@@ -39,14 +38,7 @@ pub enum Outcome {
     SelectionChanged,
 }
 
-/// Formats a byte count for the size column.
-pub type FormatSize = fn(u64) -> String;
-
-/// Formats epoch seconds for the modified column.
-pub type FormatModified = fn(i64) -> String;
-
 /// The state of one file-browser screen: tree, navigation, columns, selection, sorting, mode.
-#[derive(Debug)]
 pub struct Browser {
     // Internal to the `browser` module: every topic file works on these directly; what the app may see goes through the methods below and in the topic files.
     pub(super) nodes: HashMap<NodeId, Node>,
@@ -76,8 +68,29 @@ pub struct Browser {
     pub(super) extensions: Option<Vec<String>>,
     pub(super) mode: Mode,
     pub(super) columns: Vec<Box<dyn Column>>,
-    pub(super) format_size: FormatSize,
-    pub(super) format_modified: FormatModified,
+}
+
+// Boxed columns are not Debug, so Browser cannot derive it.
+impl std::fmt::Debug for Browser {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Browser")
+            .field("nodes", &self.nodes)
+            .field("path", &self.path)
+            .field("current", &self.current)
+            .field("expanded", &self.expanded)
+            .field("selected", &self.selected)
+            .field("selection", &self.selection)
+            .field("checkboxes", &self.checkboxes)
+            .field("armed", &self.armed)
+            .field("sort_column", &self.sort_column)
+            .field("sort_ascending", &self.sort_ascending)
+            .field("folders_first", &self.folders_first)
+            .field("folders_only", &self.folders_only)
+            .field("extensions", &self.extensions)
+            .field("mode", &self.mode)
+            .field("columns", &self.columns.len())
+            .finish()
+    }
 }
 
 impl Browser {
@@ -113,12 +126,10 @@ impl Browser {
             extensions: None,
             mode: Mode::Browse,
             columns: vec![
-                Box::new(NameColumn),
-                Box::new(ModifiedColumn),
-                Box::new(SizeColumn),
+                Box::new(NameColumn::new()),
+                Box::new(ModifiedColumn::new()),
+                Box::new(SizeColumn::new()),
             ],
-            format_size: format_bytes,
-            format_modified: format_epoch,
         }
     }
 
@@ -210,17 +221,12 @@ impl Browser {
         }
     }
 
-    /// Override the size and modified renderers (e.g. to localise).
-    pub fn set_formatters(&mut self, size: FormatSize, modified: FormatModified) {
-        self.format_size = size;
-        self.format_modified = modified;
-    }
-
-    pub fn format_size(&self, bytes: u64) -> String {
-        (self.format_size)(bytes)
-    }
-
-    pub fn format_modified(&self, epoch: i64) -> String {
-        (self.format_modified)(epoch)
+    /// Replace every column but the built-in Name column at index 0 (which stays, so sorting, the breadcrumb and the rows keep their anchor); pass [`SizeColumn::new`] / [`ModifiedColumn::new`] instances to configure headers and renderers, or your own [`Column`]s.
+    pub fn set_columns(&mut self, columns: impl IntoIterator<Item = Box<dyn Column>>) {
+        self.columns.truncate(1);
+        self.columns.extend(columns);
+        if self.sort_column >= self.columns.len() {
+            self.sort_column = 0;
+        }
     }
 }

@@ -103,3 +103,35 @@ impl Column for ExtensionColumn {
             .cmp(b.name.rsplit('.').next().unwrap_or(""))
     }
 }
+
+#[test]
+fn set_columns_replaces_everything_but_the_name_anchor() {
+    let mut browser = Browser::sample();
+    browser.set_columns([
+        Box::new(
+            crate::SizeColumn::new()
+                .with_header("Bytes")
+                .format(|b| format!("{b} B")),
+        ) as Box<dyn Column>,
+        Box::new(ExtensionColumn),
+    ]);
+    let notes = NodeId::derive(NodeId::ROOT, EntryKind::File, "notes.txt");
+    let node = browser.node(notes).expect("notes");
+    assert_eq!(browser.columns().len(), 3, "Name stayed at index 0");
+    assert_eq!(browser.columns()[1].header(), "Bytes");
+    assert_eq!(
+        browser.columns()[1].cell(&browser, node).to_text(),
+        Some("900 B"),
+        "the closure formatter renders"
+    );
+    assert_eq!(browser.columns()[2].header(), "Ext");
+    browser.sort_by_column(1);
+    assert_eq!(browser.sort(), (1, true));
+    browser.set_columns([]);
+    assert_eq!(browser.columns().len(), 1, "the defaults can be reset away");
+    assert_eq!(
+        browser.sort(),
+        (0, true),
+        "a sort column past the end fell back to Name"
+    );
+}

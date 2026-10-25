@@ -30,10 +30,20 @@ pub enum Cell {
     },
 }
 
+impl Cell {
+    /// The cell's text, if it has any (tests and apps poking at custom columns' output).
+    pub fn to_text(&self) -> Option<&str> {
+        match self {
+            Cell::Empty | Cell::Glyph(_) => None,
+            Cell::Text { text, .. } | Cell::Both { text, .. } => Some(text),
+        }
+    }
+}
+
 /// One column of the row: a header, a cell per node and — optionally — a sort order. Implement this to add columns (file type, owner, cloud provider, sync state …).
 ///
 /// The Name column (index 0) is built in and rendered specially (flexible width, clickable, folder/file icon); custom columns render their [`Cell`] as-is.
-pub trait Column: fmt::Debug {
+pub trait Column {
     /// Header label, clicked to sort by this column.
     fn header(&self) -> String;
 
@@ -50,13 +60,33 @@ pub trait Column: fmt::Debug {
     }
 }
 
-/// The built-in Name column (index 0): the flexible, clickable one.
+/// The built-in Name column (index 0): the flexible, clickable one. Its header is "Name" unless set otherwise.
 #[derive(Debug)]
-pub struct NameColumn;
+pub struct NameColumn {
+    header: Option<String>,
+}
+
+impl Default for NameColumn {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl NameColumn {
+    pub fn new() -> Self {
+        Self { header: None }
+    }
+
+    /// Replace the header label (the first column header in [`headers`](crate::Browser::columns) order).
+    pub fn with_header(mut self, header: impl Into<String>) -> Self {
+        self.header = Some(header.into());
+        self
+    }
+}
 
 impl Column for NameColumn {
     fn header(&self) -> String {
-        "Name".into()
+        self.header.clone().unwrap_or_else(|| "Name".into())
     }
 
     fn width(&self) -> ColumnWidth {
@@ -76,21 +106,47 @@ impl Column for NameColumn {
     }
 }
 
-/// The built-in modification-time column, rendered with [`format_modified`](Browser::format_modified).
-#[derive(Debug)]
-pub struct ModifiedColumn;
+/// The built-in modification-time column, rendering each node through its [`format`](Self::format) closure (default [`format_epoch`](crate::format_epoch)).
+pub struct ModifiedColumn {
+    header: Option<String>,
+    format: Box<dyn Fn(i64) -> String>,
+}
+
+impl Default for ModifiedColumn {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl ModifiedColumn {
+    pub fn new() -> Self {
+        Self {
+            header: None,
+            format: Box::new(crate::format::format_epoch),
+        }
+    }
+
+    /// Replace the header label.
+    pub fn with_header(mut self, header: impl Into<String>) -> Self {
+        self.header = Some(header.into());
+        self
+    }
+
+    /// Replace the renderer, e.g. to localise: the closure gets the raw epoch seconds and may capture a locale.
+    pub fn format(mut self, f: impl Fn(i64) -> String + 'static) -> Self {
+        self.format = Box::new(f);
+        self
+    }
+}
 
 impl Column for ModifiedColumn {
     fn header(&self) -> String {
-        "Modified".into()
+        self.header.clone().unwrap_or_else(|| "Modified".into())
     }
 
-    fn cell(&self, browser: &Browser, node: &Node) -> Cell {
+    fn cell(&self, _browser: &Browser, node: &Node) -> Cell {
         Cell::Text {
-            text: node
-                .modified
-                .map(|e| browser.format_modified(e))
-                .unwrap_or_default(),
+            text: node.modified.map(|e| (self.format)(e)).unwrap_or_default(),
             muted: true,
         }
     }
@@ -102,26 +158,69 @@ impl Column for ModifiedColumn {
     }
 }
 
-/// The built-in size column, rendered with [`format_size`](Browser::format_size).
-#[derive(Debug)]
-pub struct SizeColumn;
+/// The built-in size column, rendering each node through its [`format`](Self::format) closure (default [`format_bytes`](crate::format_bytes)).
+pub struct SizeColumn {
+    header: Option<String>,
+    format: Box<dyn Fn(u64) -> String>,
+}
+
+impl Default for SizeColumn {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl SizeColumn {
+    pub fn new() -> Self {
+        Self {
+            header: None,
+            format: Box::new(crate::format::format_bytes),
+        }
+    }
+
+    /// Replace the header label.
+    pub fn with_header(mut self, header: impl Into<String>) -> Self {
+        self.header = Some(header.into());
+        self
+    }
+
+    /// Replace the renderer, e.g. to localise or to use 1024-based units: the closure gets the raw byte count and may capture a locale.
+    pub fn format(mut self, f: impl Fn(u64) -> String + 'static) -> Self {
+        self.format = Box::new(f);
+        self
+    }
+}
 
 impl Column for SizeColumn {
     fn header(&self) -> String {
-        "Size".into()
+        self.header.clone().unwrap_or_else(|| "Size".into())
     }
 
-    fn cell(&self, browser: &Browser, node: &Node) -> Cell {
+    fn cell(&self, _browser: &Browser, node: &Node) -> Cell {
         Cell::Text {
-            text: node
-                .size
-                .map(|s| browser.format_size(s))
-                .unwrap_or_default(),
+            text: node.size.map(|s| (self.format)(s)).unwrap_or_default(),
             muted: true,
         }
     }
 
     fn compare(&self, a: &Node, b: &Node) -> Ordering {
         a.size.unwrap_or(0).cmp(&b.size.unwrap_or(0))
+    }
+}
+
+// The formatter closures are not Debug, so neither column can derive it.
+impl fmt::Debug for ModifiedColumn {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("ModifiedColumn")
+            .field("header", &self.header)
+            .finish_non_exhaustive()
+    }
+}
+
+impl fmt::Debug for SizeColumn {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("SizeColumn")
+            .field("header", &self.header)
+            .finish_non_exhaustive()
     }
 }

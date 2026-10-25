@@ -31,7 +31,7 @@ where
         let content = if self.browser.has_selection() {
             let count = self.browser.selected().count();
             let count =
-                container(self.strong(format!("{count} selected"))).padding([0.0, CELL_PAD]);
+                container(self.strong((self.labels.selected)(count))).padding([0.0, CELL_PAD]);
             match marker {
                 Some(marker) => row![
                     container(marker).center_x(Length::Fixed(MARKER_CELL)),

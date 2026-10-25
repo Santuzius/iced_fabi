@@ -5,6 +5,7 @@
 mod action;
 mod cut;
 mod header;
+mod labels;
 mod list;
 mod paint;
 mod toolbar;
@@ -26,6 +27,7 @@ use crate::{
 };
 
 pub use action::ActionPlacement;
+pub use labels::Labels;
 
 /// Which separator lines the list draws; [`separators`](Cabinet::separators).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -87,6 +89,7 @@ pub struct Cabinet<'a, Message: Clone, Renderer> {
     pub(super) style: Rc<dyn Fn(&Theme) -> Style + 'a>,
     pub(super) icons: &'a dyn RowIcons,
     pub(super) separators: Separators,
+    pub(super) labels: Labels<'a>,
     pub(super) text_size: Option<Pixels>,
     pub(super) font: Option<Font>,
     pub(super) scrollbar: Option<(scrollable::Direction, ScrollbarStyle<'a>)>,
@@ -111,6 +114,7 @@ where
         style: Rc::new(default_style),
         icons: &TablerIcons,
         separators: Separators::default(),
+        labels: Labels::default(),
         text_size: None,
         font: None,
         scrollbar: None,

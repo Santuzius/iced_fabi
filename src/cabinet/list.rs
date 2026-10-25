@@ -38,17 +38,17 @@ where
         let current = self.browser.node(self.browser.current());
         let mut status = false;
         if current.is_some_and(|n| n.loading) {
-            list = list.push(self.status_line("Loading…", None, 0.0));
+            list = list.push(self.status_line(self.labels.loading.clone(), None, 0.0));
             status = true;
         } else if current.is_some_and(|n| n.failed) {
             list = list.push(self.status_line(
-                "Could not load — tap to retry",
+                self.labels.retry.clone(),
                 Some(self.browser.current()),
                 0.0,
             ));
             status = true;
         } else if current.is_some_and(|n| n.children_known && n.children.is_empty()) {
-            list = list.push(self.status_line("Empty", None, 0.0));
+            list = list.push(self.status_line(self.labels.empty.clone(), None, 0.0));
             status = true;
         }
         // The last entry gets a line below it too, the same colour as the ones between the rows.
@@ -74,10 +74,10 @@ where
             if row.expanded && node.children.is_empty() {
                 let indent = INDENT * (row.depth + 1) as f32 + CARET + GAP;
                 if node.loading {
-                    list = list.push(self.status_line("Loading…", None, indent));
+                    list = list.push(self.status_line(self.labels.loading.clone(), None, indent));
                 } else if node.failed {
                     list = list.push(self.status_line(
-                        "Could not load — tap to retry",
+                        self.labels.retry.clone(),
                         Some(row.id),
                         indent,
                     ));
@@ -93,7 +93,7 @@ where
     /// A muted note in the Name column (loading, empty, failed with retry), `indent` px into the cell.
     fn status_line(
         &self,
-        label: &'a str,
+        label: String,
         retry: Option<NodeId>,
         indent: f32,
     ) -> Element<'a, Message, Theme, Renderer> {
