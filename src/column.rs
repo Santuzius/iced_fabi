@@ -5,7 +5,7 @@ use std::{cmp::Ordering, fmt};
 use crate::{browser::Browser, browser::node::Node, natural::name_key};
 
 /// How a column asks for its share of the row width.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum ColumnWidth {
     /// A single flexible share — the same as `Portion(1)`.
     Fill,
@@ -62,6 +62,11 @@ pub trait Column {
         ColumnWidth::Portion(2)
     }
 
+    /// Stable identity for configuration lists such as [`Browser::set_visible_columns`](Browser::set_visible_columns), which name columns instead of counting indices. Defaults to the header; the built-in columns return a fixed id, so renaming one with `with_header` never breaks a configuration that lists it. A custom column usually keeps the default, and fixes its id here when the header is localized.
+    fn id(&self) -> String {
+        self.header()
+    }
+
     /// The cell for this node.
     fn cell(&self, browser: &Browser, node: &Node) -> Cell;
 
@@ -100,6 +105,10 @@ impl NameColumn {
 impl Column for NameColumn {
     fn header(&self) -> String {
         self.header.clone().unwrap_or_else(|| "Name".into())
+    }
+
+    fn id(&self) -> String {
+        "name".into()
     }
 
     fn width(&self) -> ColumnWidth {
@@ -159,6 +168,10 @@ impl Column for ModifiedColumn {
         self.header.clone().unwrap_or_else(|| "Modified".into())
     }
 
+    fn id(&self) -> String {
+        "modified".into()
+    }
+
     fn cell(&self, _browser: &Browser, node: &Node) -> Cell {
         Cell::Text {
             text: node.modified.map(|e| (self.format)(e)).unwrap_or_default(),
@@ -213,6 +226,10 @@ impl Column for SizeColumn {
         self.header.clone().unwrap_or_else(|| "Size".into())
     }
 
+    fn id(&self) -> String {
+        "size".into()
+    }
+
     fn cell(&self, _browser: &Browser, node: &Node) -> Cell {
         Cell::Text {
             text: node.size.map(|s| (self.format)(s)).unwrap_or_default(),
@@ -222,6 +239,66 @@ impl Column for SizeColumn {
 
     fn compare(&self, a: &Node, b: &Node) -> Ordering {
         a.size.unwrap_or(0).cmp(&b.size.unwrap_or(0))
+    }
+}
+
+/// The built-in columns as a unit enum that is itself a [`Column`]: one variant per column, dispatching to the [`NameColumn`], [`ModifiedColumn`] and [`SizeColumn`] defaults. Use it wherever a column needs naming without constructing a struct — [`Browser::set_columns`](Browser::set_columns) takes boxed variants of it, and [`ColumnKey::from`] turns a variant into a key for [`Browser::set_visible_columns`](Browser::set_visible_columns). For custom headers or renderers use the structs.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BuiltInColumn {
+    /// The flexible, clickable name column.
+    Name,
+    /// The modification-time column with its default rendering.
+    Modified,
+    /// The size column with its default rendering.
+    Size,
+}
+
+impl Column for BuiltInColumn {
+    fn header(&self) -> String {
+        self.column().header()
+    }
+
+    fn id(&self) -> String {
+        self.column().id()
+    }
+
+    fn width(&self) -> ColumnWidth {
+        self.column().width()
+    }
+
+    fn cell(&self, browser: &Browser, node: &Node) -> Cell {
+        self.column().cell(browser, node)
+    }
+
+    fn compare(&self, a: &Node, b: &Node) -> Ordering {
+        self.column().compare(a, b)
+    }
+}
+
+impl BuiltInColumn {
+    /// The struct behind this variant, with its default configuration.
+    fn column(&self) -> Box<dyn Column> {
+        match self {
+            Self::Name => Box::new(NameColumn::new()),
+            Self::Modified => Box::new(ModifiedColumn::new()),
+            Self::Size => Box::new(SizeColumn::new()),
+        }
+    }
+}
+
+/// A column named in a configuration list: [`ColumnKey::from`] turns any [`Column`] value into one, and lists like [`Browser::set_visible_columns`](Browser::set_visible_columns) match it against the browser's columns by [`id`](Column::id) — `ColumnKey::from(BuiltInColumn::Size)` names a built-in, `ColumnKey::from(TypeColumn)` one of your own.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ColumnKey(String);
+
+impl<C: Column> From<C> for ColumnKey {
+    fn from(column: C) -> Self {
+        Self(column.id())
+    }
+}
+
+impl ColumnKey {
+    pub(crate) fn id(&self) -> &str {
+        &self.0
     }
 }
 

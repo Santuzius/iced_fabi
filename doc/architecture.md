@@ -4,7 +4,7 @@ One crate, two halves: the state (`browser/`) and the widget (`cabinet/`), plus 
 
 - `src/lib.rs` — crate docs and the `pub use` list; the only place anything is re-exported.
 - `src/browser/` — the [`Browser`](crate::Browser) state. Every file adds its own `impl Browser` block, so the fields stay private to `browser` while each topic works on them directly:
-  - `mod.rs` — the struct, `new`/`open`, `update` (the whole event routing), and the settings that do not belong to one topic: columns (`add_column`, `set_columns`, `sort_by_column`) and the visibility switches.
+  - `mod.rs` — the struct, `new`/`open`, `update` (the whole event routing), and the settings that do not belong to one topic: columns (`add_column`, `set_columns`, `sort_by_column`) and their visibility (`hide_column`/`show_column`, `set_visible_columns`).
   - `node.rs` — the pure-data vocabulary: `NodeId` (derived ids), `Entry` (with `folder`/`file` builders), `Node` (carries its `id`), `EntryKind`, `Marker`, `Mode`, the selection enums, and the tree helpers `is_below` / `Node::id`.
   - `loading.rs` — the listing feed (`set_children`, `load_failed`, `request_load`) and removal (`remove`, `remove_selected`, `prune`).
   - `navigation.rs` — `activate`, `tap`, `goto`, `up`, mode, and the position queries (`current`, `path`, `node`, `name_chain`, `path_below_root`).
@@ -14,14 +14,14 @@ One crate, two halves: the state (`browser/`) and the widget (`cabinet/`), plus 
   - `tests/` — one file per topic module; the shared root listing is `Browser::sample`.
 - `src/cabinet/` — the [`Cabinet`](crate::Cabinet) widget, rebuilt per frame:
   - `mod.rs` — the struct, builder setters (all settings in one place), `build`, and `Separators`.
-  - `paint.rs` — geometry constants, the `ColourField` colour selector, flat-button, rule and background-layer helpers, the column `template` header and rows share (its `rules` argument says which rows carry the upright rules), and `stripe_of` for the zebra colour.
+  - `paint.rs` — geometry constants, the `ColourField` colour selector, flat-button, rule and background-layer helpers, the column `template` header and rows share (its `rules` argument says which rows carry the upright rules, hidden columns are skipped whole), and `stripe_of` for the zebra colour.
   - `toolbar.rs` — breadcrumbs, mode switch, tool groups; the separator-collapsing rule is a pure `prune_separators` with its own tests.
   - `header.rs` — the select-all box, sort buttons, selection count.
   - `list.rs` — browse/tree lists, one row, status lines, cells.
   - `action.rs` — the `ActionButton` (placement, `when` rule) and its `ActionPlacement`.
   - `labels.rs` — the `Labels` (status lines, count line) and `Cabinet::labels`.
   - `cut.rs` — the ellipsis label (a plain iced `Widget`).
-- `src/column.rs` — the [`Column`](crate::Column) trait and the built-in Name/Modified/Size columns.
+- `src/column.rs` — the [`Column`](crate::Column) trait (header, `id`, width, cell, compare), the built-in Name/Modified/Size columns, the `BuiltInColumn` unit enum and the `ColumnKey` used by the visibility lists.
 - `src/natural.rs` — natural ("File 2" < "File 10") comparison keys.
 - `src/format.rs` — `format_bytes`, `format_epoch`.
 - `src/tool.rs` — the toolbar [`Tool`](crate::Tool) trait and the closure-built [`SimpleTool`](crate::SimpleTool).

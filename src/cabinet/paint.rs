@@ -192,7 +192,7 @@ where
             .into()
     }
 
-    /// The row template: selection box (when the boxes are shown), the Name cell and the other columns. The header and every row go through here, so their columns always share the same boundaries. `rules` draws the upright rules between the cells and frames the row with them at its very left and right, so the table's edge lines are solid from the header to the last row — on the [`FRAME`](super::paint::FRAME) strip itself, where the host's frame line sits, and as overlays: a fixed-width child at the end of a filling row misplaces itself in iced's flex, while a container aligned to the edge of a stack cannot. The caller passes the flag, which lets the header carry a grid the rows do not ([`HeaderOnly`](crate::Separators::HeaderOnly)).
+    /// The row template: selection box (when the boxes are shown), the Name cell and the other columns. The header and every row go through here, so their columns always share the same boundaries. `rules` draws the upright rules between the cells and frames the row with them at its very left and right, so the table's edge lines are solid from the header to the last row — on the [`FRAME`](super::paint::FRAME) strip itself, where the host's frame line sits, and as overlays: a fixed-width child at the end of a filling row misplaces itself in iced's flex, while a container aligned to the edge of a stack cannot. The caller passes the flag, which lets the header carry a grid the rows do not ([`HeaderOnly`](crate::Separators::HeaderOnly)). A column the browser hides is skipped whole, cell and neighbouring rule.
     pub(super) fn template(
         &self,
         height: Length,
@@ -219,6 +219,10 @@ where
         }
         row = row.push(cell(name, columns[0].width()));
         for (index, content) in cells.into_iter().enumerate() {
+            // A hidden column is skipped whole: cell and the rule before it, so its neighbours meet with one rule between them and the width they get is what a hidden column never claimed.
+            if self.browser.is_column_hidden(index + 1) {
+                continue;
+            }
             if rules {
                 row = row.push(self.vrule());
             }

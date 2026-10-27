@@ -1,6 +1,6 @@
 //! A cloud directory browser without the cloud: the listings come from a fake backend that answers every request one tick late, so the `activate → NeedsLoad → set_children` round-trip and its loading states behave like a real network drive.
 //!
-//! The bar above the cabinet demos the configuration hooks with dropdowns: the [`iced::Theme`] (including a reproduction of Syncative's palette and [`iced_fabi::Style`]), the file/folder [`iced_fabi::RowIcons`] (Tabler, or the vendored multicolour Material Icon Theme), the [`iced_fabi::Separators`] grid, the zebra stripe behind every second row, which entries are listed (all or folders only — file kinds are filtered code-side at init), how many entries the selection holds (many, one, or none), how the boxes appear (always, on long press, or hidden), and where the selection's action button sits (under the list, floating, or last in the toolbar); also what happens to toolbar tools that are not currently applicable (greyed out, or hidden outright). The toolbar itself shows the [`iced_fabi::Tool`] API (copy, paste, delete — in two groups divided by [`iced_fabi::Cabinet::tool_separator`], enabled per state, and copy/paste carries whole folder subtrees); selecting is done purely through the checkboxes. The column list gets one custom [`TypeColumn`].
+//! The bar above the cabinet demos the configuration hooks with dropdowns: the [`iced::Theme`] (including a reproduction of Syncative's palette and [`iced_fabi::Style`]), the file/folder [`iced_fabi::RowIcons`] (Tabler, or the vendored multicolour Material Icon Theme), the [`iced_fabi::Separators`] grid, the zebra stripe behind every second row, which entries are listed (all or folders only — file kinds are filtered code-side at init), how many entries the selection holds (many, one, or none), how the boxes appear (always, on long press, or hidden), and where the selection's action button sits (under the list, floating, or last in the toolbar); also what happens to toolbar tools that are not currently applicable (greyed out, or hidden outright). The toolbar itself shows the [`iced_fabi::Tool`] API (copy, paste, delete — in two groups divided by [`iced_fabi::Cabinet::tool_separator`], enabled per state, and copy/paste carries whole folder subtrees); selecting is done purely through the checkboxes. The column list gets one custom [`TypeColumn`], and a `Columns` dropdown switches which of the columns are drawn ([`Browser::hide_column`] / [`Browser::show_column`]; [`Browser::set_visible_columns`] is the same in one call at init).
 //!
 //! Run: `cargo run --example cloud_browse` — then switch modes with the icon in the top right, tap folders to drill down, tap the boxes to select (press and hold a row first when "Boxes" is on *on long press*), and watch the parent markers turn into dots.
 
@@ -10,7 +10,10 @@ use iced::{
     Element, Length, Task, Theme,
     widget::{column, container},
 };
-use iced_fabi::{Browser, Cell, Column, ColumnWidth, Entry, EntryKind, Event, Node, Outcome, tool};
+use iced_fabi::{
+    Browser, BuiltInColumn, Cell, Column, ColumnKey, ColumnWidth, Entry, EntryKind, Event, Node,
+    Outcome, tool,
+};
 
 fn main() -> iced::Result {
     iced::application(App::boot, App::update, App::view)
@@ -38,6 +41,7 @@ enum Message {
     Entries(EntryChoice),
     Selection(SelectionChoice),
     Action(ActionChoice),
+    ColumnToggle(usize),
     Tick,
 }
 
@@ -658,12 +662,31 @@ struct App {
     entries: EntryChoice,
     selection: SelectionChoice,
     action: ActionChoice,
+    /// The Columns dropdown's entries, refreshed whenever the columns change.
+    column_options: Vec<ColumnOption>,
 }
 
 impl App {
+    /// Rebuild the Columns dropdown's entries from the browser's columns (all but the always-on Name anchor).
+    fn refresh_columns(&mut self) {
+        self.column_options = (1..self.browser.columns().len())
+            .map(|index| ColumnOption {
+                index,
+                label: self.browser.columns()[index].header(),
+                visible: !self.browser.is_column_hidden(index),
+            })
+            .collect();
+    }
     fn boot() -> (Self, Task<Message>) {
         let mut browser = Browser::new("My files");
         browser.add_column(TypeColumn);
+        // All four columns on. At init a whitelist in one call is enough instead: writing only
+        // `[ColumnKey::from(BuiltInColumn::Size), ColumnKey::from(TypeColumn)]` would start with Modified hidden.
+        browser.set_visible_columns([
+            ColumnKey::from(BuiltInColumn::Modified),
+            ColumnKey::from(BuiltInColumn::Size),
+            ColumnKey::from(TypeColumn),
+        ]);
         // The file kinds the cabinet may show — an app-side decision made here at init; to offer only PDFs, write ["pdf"].
         browser.set_file_extensions(["pdf", "docx", "md", "txt"]);
         // Ask for the root immediately; everything else loads on navigation.
@@ -682,7 +705,9 @@ impl App {
             entries: EntryChoice::All,
             selection: SelectionChoice::Multiple,
             action: ActionChoice::Wide,
+            column_options: Vec::new(),
         };
+        app.refresh_columns();
         let task = Task::done(app.accept(outcome));
         (app, task)
     }
@@ -692,6 +717,15 @@ impl App {
             Message::Cabinet(event) => {
                 let outcome = self.browser.update(event);
                 Task::done(self.accept(outcome))
+            }
+            Message::ColumnToggle(column) => {
+                if self.browser.is_column_hidden(column) {
+                    self.browser.show_column(column);
+                } else {
+                    self.browser.hide_column(column);
+                }
+                self.refresh_columns();
+                Task::none()
             }
             Message::Boxes(choice) => {
                 self.boxes = choice;
@@ -890,6 +924,23 @@ impl App {
                 list.into()
             }
         }
+        fn columns_list<'a>(options: &'a [ColumnOption], syncative: bool) -> Element<'a, Message> {
+            let list = iced::widget::pick_list(
+                options,
+                None::<&ColumnOption>,
+                |option| Message::ColumnToggle(option.index),
+            )
+            .width(Length::Fixed(150.0))
+            .placeholder("pick columns");
+            if syncative {
+                list.text_size(SYNCATIVE_TEXT)
+                    .style(syncative_pick_list)
+                    .menu_style(syncative_menu)
+                    .into()
+            } else {
+                list.into()
+            }
+        }
         let bar = iced::widget::column![
             iced::widget::text(title).size(if syncative { 24 } else { 20 }),
             iced::widget::row![
@@ -907,6 +958,8 @@ impl App {
                 ),
                 label("Lines"),
                 dropdown(LINES, &self.lines, Message::Lines, 130.0, syncative),
+                label("Columns"),
+                columns_list(&self.column_options, syncative),
             ]
             .spacing(8)
             .align_y(iced::Alignment::Center),
@@ -1043,6 +1096,21 @@ impl App {
 
 /// A custom column: the file extension in capitals, folders as "Folder"; sorted by kind first, then extension.
 #[derive(Debug)]
+/// One entry of the Columns dropdown: which column it stands for, and how it reads there (a check mark for a drawn column, a cross for a hidden one).
+#[derive(Clone, PartialEq)]
+struct ColumnOption {
+    index: usize,
+    label: String,
+    visible: bool,
+}
+
+impl fmt::Display for ColumnOption {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(if self.visible { "✓ " } else { "✗ " })?;
+        f.write_str(&self.label)
+    }
+}
+
 struct TypeColumn;
 
 impl Column for TypeColumn {

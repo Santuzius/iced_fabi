@@ -20,7 +20,7 @@ pub use node::{Checkboxes, Entry, EntryKind, Marker, Mode, Node, NodeId, Selecti
 use std::collections::{HashMap, HashSet};
 
 use crate::{
-    column::{Column, ModifiedColumn, NameColumn, SizeColumn},
+    column::{Column, ColumnKey, ModifiedColumn, NameColumn, SizeColumn},
     event::Event,
 };
 
@@ -68,6 +68,8 @@ pub struct Browser {
     pub(super) extensions: Option<Vec<String>>,
     pub(super) mode: Mode,
     pub(super) columns: Vec<Box<dyn Column>>,
+    /// Parallel to [`columns`](Self::columns): a column whose flag is set is not drawn — header cell, body cells and its upright rule all stop; index 0 is never hidden.
+    pub(super) hidden: Vec<bool>,
 }
 
 // Boxed columns are not Debug, so Browser cannot derive it.
@@ -89,6 +91,7 @@ impl std::fmt::Debug for Browser {
             .field("extensions", &self.extensions)
             .field("mode", &self.mode)
             .field("columns", &self.columns.len())
+            .field("hidden", &self.hidden)
             .finish()
     }
 }
@@ -130,6 +133,7 @@ impl Browser {
                 Box::new(ModifiedColumn::new()),
                 Box::new(SizeColumn::new()),
             ],
+            hidden: vec![false; 3],
         }
     }
 
@@ -193,9 +197,10 @@ impl Browser {
         browser
     }
 
-    /// Append a custom column; returns its index (for [`sort_by_column`](Self::sort_by_column)).
+    /// Append a custom column; returns its index (for [`sort_by_column`](Self::sort_by_column)). Added columns start visible.
     pub fn add_column(&mut self, column: impl Column + 'static) -> usize {
         self.columns.push(Box::new(column));
+        self.hidden.push(false);
         self.columns.len() - 1
     }
 
@@ -222,12 +227,62 @@ impl Browser {
         }
     }
 
-    /// Replace every column but the built-in Name column at index 0 (which stays, so sorting, the breadcrumb and the rows keep their anchor); pass [`SizeColumn::new`] / [`ModifiedColumn::new`] instances to configure headers and renderers, or your own [`Column`]s.
+    /// Replace every column but the built-in Name column at index 0 (which stays, so sorting, the breadcrumb and the rows keep their anchor); pass boxed [`BuiltInColumn`](crate::BuiltInColumn) variants for the defaults, boxed [`SizeColumn::new`] / [`ModifiedColumn::new`] instances to configure headers and renderers, or boxed custom [`Column`]s. The new list starts fully visible.
     pub fn set_columns(&mut self, columns: impl IntoIterator<Item = Box<dyn Column>>) {
         self.columns.truncate(1);
         self.columns.extend(columns);
+        self.hidden.truncate(1);
+        self.hidden.resize(self.columns.len(), false);
         if self.sort_column >= self.columns.len() {
             self.sort_column = 0;
+        }
+    }
+
+    /// Take a column out of the drawing: its header cell, every body cell and its upright rules stop being painted and the remaining columns claim its width. The column itself stays in [`columns`](Self::columns) — its index and sorting by it keep working — only the painting stops. Index 0 (the Name column) is always visible; an out-of-range index does nothing.
+    pub fn hide_column(&mut self, column: usize) {
+        if column == 0 || column >= self.hidden.len() {
+            return;
+        }
+        self.hidden[column] = true;
+    }
+
+    /// Put a [hidden](Self::hide_column) column back into the drawing.
+    pub fn show_column(&mut self, column: usize) {
+        if column < self.hidden.len() {
+            self.hidden[column] = false;
+        }
+    }
+
+    /// Whether this column is hidden from the drawing (out of range: false).
+    pub fn is_column_hidden(&self, column: usize) -> bool {
+        self.hidden.get(column).copied().unwrap_or(false)
+    }
+
+    /// Show these columns and only these; every other one is hidden (the Name column at index 0 is never). The entries are [`ColumnKey`]s, and [`ColumnKey::from`] turns any [`Column`] value into one: built-ins as `ColumnKey::from(BuiltInColumn::Size)`, a custom column as `ColumnKey::from(TypeColumn)`, matched on the [`id`](Column::id) the columns report. An id that matches no column does nothing.
+    ///
+    /// ```
+    /// # use iced_fabi::{Browser, BuiltInColumn, Cell, Column, ColumnKey};
+    /// # struct TypeColumn;
+    /// # impl Column for TypeColumn {
+    /// #     fn header(&self) -> String {
+    /// #         "Type".into()
+    /// #     }
+    /// #     fn cell(&self, _browser: &Browser, _node: &iced_fabi::Node) -> Cell {
+    /// #         Cell::Empty
+    /// #     }
+    /// # }
+    /// let mut browser = Browser::new("My files");
+    /// browser.add_column(TypeColumn);
+    /// // an app that offers only size and type:
+    /// browser.set_visible_columns([ColumnKey::from(BuiltInColumn::Size), ColumnKey::from(TypeColumn)]);
+    /// assert!(browser.is_column_hidden(1)); // Modified
+    /// assert!(!browser.is_column_hidden(2)); // Size
+    /// assert!(!browser.is_column_hidden(3)); // Type
+    /// ```
+    pub fn set_visible_columns(&mut self, visible: impl IntoIterator<Item = ColumnKey>) {
+        let wanted: Vec<String> = visible.into_iter().map(|key| key.id().to_owned()).collect();
+        for (index, column) in self.columns.iter().enumerate().skip(1) {
+            self.hidden[index] = !wanted.contains(&column.id());
         }
     }
 }
