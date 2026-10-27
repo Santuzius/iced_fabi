@@ -60,6 +60,8 @@ pub struct Browser {
     pub(super) armed: bool,
     /// Index into [`columns`](Self::columns); index 0 is the built-in [`NameColumn`].
     pub(super) sort_column: usize,
+    /// The [`id`](Column::id) behind [`sort_column`](Self::sort_column); [`set_columns`](Self::set_columns) re-finds the index by this id, because a replacement list can move or drop the sorted column.
+    pub(super) sort_id: String,
     pub(super) sort_ascending: bool,
     /// Folders sort before files regardless of the key, as file managers usually do.
     pub(super) folders_first: bool,
@@ -90,6 +92,7 @@ impl std::fmt::Debug for Browser {
             .field("checkboxes", &self.checkboxes)
             .field("armed", &self.armed)
             .field("sort_column", &self.sort_column)
+            .field("sort_id", &self.sort_id)
             .field("sort_ascending", &self.sort_ascending)
             .field("folders_first", &self.folders_first)
             .field("folders_only", &self.folders_only)
@@ -130,6 +133,7 @@ impl Browser {
             held: None,
             armed: false,
             sort_column: 0,
+            sort_id: NameColumn::new().id(),
             sort_ascending: true,
             folders_first: true,
             folders_only: false,
@@ -234,16 +238,22 @@ impl Browser {
             self.sort_column = column;
             self.sort_ascending = true;
         }
+        self.sort_id = self.columns[column].id();
     }
 
-    /// Replace every column but the built-in Name column at index 0 (which stays, so sorting, the breadcrumb and the rows keep their anchor); pass boxed [`BuiltInColumn`](crate::BuiltInColumn) variants for the defaults, boxed [`SizeColumn::new`] / [`ModifiedColumn::new`] instances to configure headers and renderers, or boxed custom [`Column`]s. The new list starts fully visible.
+    /// Replace every column but the built-in Name column at index 0 (which stays, so sorting, the breadcrumb and the rows keep their anchor); pass boxed [`BuiltInColumn`](crate::BuiltInColumn) variants for the defaults, boxed [`SizeColumn::new`] / [`ModifiedColumn::new`] instances to configure headers and renderers, or boxed custom [`Column`]s. The new list starts fully visible. Sorting follows the sorted column by its [`id`](Column::id): it keeps its direction at a new index, and a list without it sorts by Name, ascending.
     pub fn set_columns(&mut self, columns: impl IntoIterator<Item = Box<dyn Column>>) {
         self.columns.truncate(1);
         self.columns.extend(columns);
         self.hidden.truncate(1);
         self.hidden.resize(self.columns.len(), false);
-        if self.sort_column >= self.columns.len() {
-            self.sort_column = 0;
+        match self.columns.iter().position(|c| c.id() == self.sort_id) {
+            Some(index) => self.sort_column = index,
+            None => {
+                self.sort_column = 0;
+                self.sort_ascending = true;
+                self.sort_id = self.columns[0].id();
+            }
         }
     }
 

@@ -114,6 +114,31 @@ fn setting_and_adding_columns_resets_or_extends_visibility() {
 }
 
 #[test]
+fn set_columns_follows_the_sorted_column_to_its_new_place() {
+    let mut browser = Browser::new("My files");
+    browser.sort_by_column(2); // Size, ascending
+    browser.sort_by_column(2); // descending
+    assert_eq!(browser.sort(), (2, false));
+    // Same columns in another order: Size sits at index 1 now.
+    browser.set_columns([
+        Box::new(BuiltInColumn::Size) as Box<dyn Column>,
+        Box::new(BuiltInColumn::Modified),
+    ]);
+    assert_eq!(
+        browser.sort(),
+        (1, false),
+        "still sorted by Size, at its new index"
+    );
+    // A list without Size at all: back to the Name anchor, ascending.
+    browser.set_columns([Box::new(BuiltInColumn::Modified) as Box<dyn Column>]);
+    assert_eq!(
+        browser.sort(),
+        (0, true),
+        "a gone sort column falls back to Name"
+    );
+}
+
+#[test]
 fn the_built_in_enum_dispatches_like_the_structs() {
     assert_eq!(
         BuiltInColumn::Name.header(),
