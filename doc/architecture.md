@@ -8,7 +8,7 @@ One crate, two halves: the state (`browser/`) and the widget (`cabinet/`), plus 
   - `node.rs` — the pure-data vocabulary: `NodeId` (derived ids), `Entry` (with `folder`/`file` builders), `Node` (carries its `id`), `EntryKind`, `Marker`, `Mode`, the selection enums, and the tree helpers `is_below` / `Node::id`.
   - `loading.rs` — the listing feed (`set_children`, `load_failed`, `request_load`) and removal (`remove`, `remove_selected`, `prune`).
   - `navigation.rs` — `activate`, `tap`, `goto`, `up`, mode, and the position queries (`current`, `path`, `node`, `name_chain`, `path_below_root`).
-  - `selection.rs` — Material-style unit selection: `toggle`, `toggle_all`, `select_all`, `clear_selection`, markers, and the covered-entry rules.
+  - `selection.rs` — Material-style unit selection: `toggle`, `toggle_all`, `select_all`, `clear_selection`, markers, and the covered-entry rules; the units live in an insertion-ordered `Selected` set, not a `HashSet`, so results do not depend on hash order.
   - `long_press.rs` — the hold that arms the boxes in `Checkboxes::OnLongPress` (`hold_started`, `hold_ended`, `disarm`, `LONG_PRESS`).
   - `rows.rs` — `browse_rows` / `tree_rows` and the sorting plus the visibility filters (`folders_only`, `file_extensions`) that decide which entries appear.
   - `tests/` — one file per topic module; the shared root listing is `Browser::sample`.

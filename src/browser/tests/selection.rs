@@ -259,3 +259,36 @@ fn selection_none_never_selects() {
         "and switching into the view drops it"
     );
 }
+
+#[test]
+fn selected_yields_in_tick_order_and_single_keeps_the_last() {
+    // 20 runs: a HashSet order that happens to match the tick order in one process would pass by luck.
+    for _ in 0..20 {
+        let mut browser = Browser::new("r");
+        browser.set_children(
+            NodeId::ROOT,
+            vec![
+                Entry::file("a.txt"),
+                Entry::file("b.txt"),
+                Entry::file("c.txt"),
+            ],
+        );
+        let a = NodeId::derive(NodeId::ROOT, EntryKind::File, "a.txt");
+        let b = NodeId::derive(NodeId::ROOT, EntryKind::File, "b.txt");
+        let c = NodeId::derive(NodeId::ROOT, EntryKind::File, "c.txt");
+        browser.toggle(a);
+        browser.toggle(b);
+        browser.toggle(c);
+        assert_eq!(
+            browser.selected().collect::<Vec<_>>(),
+            vec![a, b, c],
+            "selected() yields in selection order"
+        );
+        browser.set_selection(crate::Selection::Single);
+        assert_eq!(
+            browser.selected().collect::<Vec<_>>(),
+            vec![c],
+            "entering Single keeps the most recently selected unit"
+        );
+    }
+}

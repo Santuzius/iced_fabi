@@ -1,7 +1,73 @@
 //! Material-style unit selection: ticking, the select-all box, markers, and the rules about covered entries.
 
+use std::collections::HashSet;
+
 use super::{Browser, Checkboxes, NodeId, Selection};
 use crate::Marker;
+
+/// The explicit unit selections in selection order: `order` gives `iter` and `last` their tick order, `set` answers `contains` in constant time. The two are kept in step by the methods below and never touched directly; the field on [`Browser`] stays inside the `browser` module.
+#[derive(Debug, Default)]
+pub(crate) struct Selected {
+    order: Vec<NodeId>,
+    set: HashSet<NodeId>,
+}
+
+impl Selected {
+    /// Adds an id at the end of the selection order; an id already selected keeps its position. Whether it was new.
+    pub fn insert(&mut self, id: NodeId) -> bool {
+        if self.set.insert(id) {
+            self.order.push(id);
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Drops an id from the selection order. Whether it was selected.
+    pub fn remove(&mut self, id: &NodeId) -> bool {
+        if self.set.remove(id) {
+            let position = self
+                .order
+                .iter()
+                .position(|entry| entry == id)
+                .expect("set and order kept in step");
+            self.order.remove(position);
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn contains(&self, id: &NodeId) -> bool {
+        self.set.contains(id)
+    }
+
+    /// The selected ids in selection order, oldest first.
+    pub fn iter(&self) -> std::slice::Iter<'_, NodeId> {
+        self.order.iter()
+    }
+
+    /// The most recently selected id.
+    pub fn last(&self) -> Option<NodeId> {
+        self.order.last().copied()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.order.is_empty()
+    }
+
+    pub fn clear(&mut self) {
+        self.order.clear();
+        self.set.clear();
+    }
+
+    /// Adds the ids not yet selected, at the end of the order and in the given sequence.
+    pub fn extend(&mut self, ids: impl IntoIterator<Item = NodeId>) {
+        for id in ids {
+            self.insert(id);
+        }
+    }
+}
 
 impl Browser {
     /// How many entries can be selected at once.
@@ -14,16 +80,16 @@ impl Browser {
         self.checkboxes
     }
 
-    /// How many entries can be selected at once — or none at all. Entering [`None`](Selection::None) drops any existing selection; the others keep it. Default: [`Multiple`](Selection::Multiple).
+    /// How many entries can be selected at once — or none at all. Entering [`None`](Selection::None) drops any existing selection; entering [`Single`](Selection::Single) keeps the most recently selected unit and drops the rest; [`Multiple`](Selection::Multiple) keeps everything. Default: [`Multiple`](Selection::Multiple).
     pub fn set_selection(&mut self, selection: Selection) {
         self.selection = selection;
         match selection {
             Selection::None => self.selected.clear(),
             Selection::Single => {
-                // Keep at most one unit: the first explicit one wins, the rest go.
-                let first = self.selected.iter().next().copied();
+                // Keep at most one unit: the most recently selected one, the rest go.
+                let last = self.selected.last();
                 self.selected.clear();
-                if let Some(id) = first {
+                if let Some(id) = last {
                     self.selected.insert(id);
                 }
             }
@@ -50,7 +116,7 @@ impl Browser {
         }
     }
 
-    /// The explicit unit selections; effective selection is this set (a selected folder stands for its whole subtree).
+    /// The explicit unit selections in selection order, oldest first (effective selection is this set — a selected folder stands for its whole subtree).
     pub fn selected(&self) -> impl Iterator<Item = NodeId> + use<'_> {
         self.selected.iter().copied()
     }

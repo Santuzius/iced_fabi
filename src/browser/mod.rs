@@ -48,8 +48,8 @@ pub struct Browser {
     pub(super) current: NodeId,
     /// Nodes whose branch is open in tree mode. The path to the current node is kept expanded so browse→tree shows the same place.
     pub(super) expanded: HashSet<NodeId>,
-    /// Explicit unit selections; a node selected here is not selected again below it, and [`toggle`](Self::toggle) refuses to select under a selected ancestor.
-    pub(super) selected: HashSet<NodeId>,
+    /// Explicit unit selections, in selection order; a node selected here is not selected again below it, and [`toggle`](Self::toggle) refuses to select under a selected ancestor.
+    pub(super) selected: selection::Selected,
     /// How many entries can be selected at once (or none at all).
     pub(super) selection: Selection,
     /// How the selection boxes appear.
@@ -124,7 +124,7 @@ impl Browser {
             path: vec![NodeId::ROOT],
             current: NodeId::ROOT,
             expanded: HashSet::from([NodeId::ROOT]),
-            selected: HashSet::new(),
+            selected: selection::Selected::default(),
             selection: Selection::Multiple,
             checkboxes: Checkboxes::Shown,
             held: None,
