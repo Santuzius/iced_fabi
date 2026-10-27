@@ -1,6 +1,7 @@
 //! The listing feed from the application ([`Browser::set_children`]) and the removal side: pruning gone entries, deleting selected ones, and the fallback when the view points at a pruned node.
 
 use super::{Browser, Node, NodeId, Outcome, node::Entry};
+use std::collections::HashSet;
 
 impl Browser {
     /// Whether a load of this node is requested and unanswered.
@@ -40,14 +41,18 @@ impl Browser {
 
     /// Answer a [`NeedsLoad`](Outcome::NeedsLoad): install `entries` as the children of `id`.
     ///
-    /// Does nothing if `id` is gone (pruned by an earlier refresh — the app's own staleness guard can also skip the call). Existing child nodes keep their id, so their expansion and selections survive; children that disappeared are pruned with their whole subtree.
+    /// Does nothing if `id` is gone (pruned by an earlier refresh — the app's own staleness guard can also skip the call). Existing child nodes keep their id, so their expansion and selections survive; children that disappeared are pruned with their whole subtree. Two entries naming the same child (a backend that repeats itself) count once: the first one fills the node, the later ones are ignored.
     pub fn set_children(&mut self, id: NodeId, entries: Vec<Entry>) {
         if !self.nodes.contains_key(&id) {
             return;
         }
         let mut next = Vec::with_capacity(entries.len());
+        let mut fresh: HashSet<NodeId> = HashSet::with_capacity(entries.len());
         for entry in entries {
             let child_id = NodeId::derive(id, entry.kind, &entry.name);
+            if !fresh.insert(child_id) {
+                continue;
+            }
             let node = self.nodes.entry(child_id).or_insert(Node {
                 id: child_id,
                 name: entry.name.clone(),
@@ -76,7 +81,7 @@ impl Browser {
             .children
             .iter()
             .copied()
-            .filter(|child| !next.contains(child))
+            .filter(|child| !fresh.contains(child))
             .collect();
         parent.children = next;
         for child in stale {

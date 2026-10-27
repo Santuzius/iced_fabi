@@ -44,6 +44,32 @@ fn remove_selected_deletes_and_prunes() {
 }
 
 #[test]
+fn duplicate_entries_in_one_listing_count_once() {
+    let mut browser = Browser::sample();
+    // A backend that lists the same entry twice must not double the row.
+    browser.set_children(
+        NodeId::ROOT,
+        vec![
+            Entry::file("a.txt").size(10),
+            Entry::file("a.txt").size(999),
+            Entry::folder("b"),
+        ],
+    );
+    let root = browser.node(NodeId::ROOT).expect("root");
+    assert_eq!(root.children.len(), 2, "the duplicate is dropped");
+    let a = NodeId::derive(NodeId::ROOT, EntryKind::File, "a.txt");
+    assert_eq!(
+        root.children.iter().filter(|id| **id == a).count(),
+        1,
+        "and its id is not listed twice"
+    );
+    let node = browser.node(a).expect("a.txt");
+    assert_eq!(node.size, Some(10), "the first entry wins");
+    let rows = browser.browse_rows();
+    assert_eq!(rows.len(), 2, "so the view shows two rows");
+}
+
+#[test]
 fn remove_drops_nested_ids_once_and_refuses_the_root() {
     let mut browser = Browser::sample();
     let folder = NodeId::derive(NodeId::ROOT, EntryKind::Folder, "Finanzen");
