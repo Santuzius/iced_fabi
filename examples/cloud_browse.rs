@@ -200,6 +200,7 @@ const ACTION_CHOICES: &[ActionChoice] = &[
 
 const LINES: &[iced_fabi::Separators] = &[
     iced_fabi::Separators::None,
+    iced_fabi::Separators::HeaderOnly,
     iced_fabi::Separators::Horizontal,
     iced_fabi::Separators::Vertical,
     iced_fabi::Separators::Both,
@@ -905,7 +906,7 @@ impl App {
                     syncative
                 ),
                 label("Lines"),
-                dropdown(LINES, &self.lines, Message::Lines, 120.0, syncative),
+                dropdown(LINES, &self.lines, Message::Lines, 130.0, syncative),
             ]
             .spacing(8)
             .align_y(iced::Alignment::Center),

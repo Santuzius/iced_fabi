@@ -33,6 +33,7 @@ where
             // The count row keeps the full template (marker cell, Name column, rules) so the grid does not fall apart while something is selected.
             self.template(
                 Length::Fixed(ROW_HEIGHT),
+                self.separators.header_rules(),
                 marker.unwrap_or_else(|| iced_widget::Space::new().into()),
                 container(self.strong((self.labels.selected)(count))).into(),
                 self.empty_cells(),
@@ -49,6 +50,7 @@ where
             }
             self.template(
                 Length::Fixed(ROW_HEIGHT),
+                self.separators.header_rules(),
                 marker.unwrap_or_else(|| iced_widget::Space::new().into()),
                 name,
                 headers,

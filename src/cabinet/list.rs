@@ -114,6 +114,7 @@ where
         // Through the template, so the upright rules stay solid across a status line too; only the indent is the status line's own.
         self.template(
             Length::Fixed(ROW_HEIGHT),
+            self.separators.vertical(),
             iced_widget::Space::new().into(),
             row![Space::new().width(Length::Fixed(indent)), content]
                 .align_y(Alignment::Center)
@@ -166,6 +167,7 @@ where
             .collect();
         let content = self.template(
             Length::Fixed(ROW_HEIGHT),
+            self.separators.vertical(),
             self.marker_button(row.marker, crate::Event::MarkerPressed(row.id)),
             name.into(),
             cells,

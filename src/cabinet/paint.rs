@@ -177,10 +177,11 @@ where
             .into()
     }
 
-    /// The row template: selection box (when the boxes are shown), the Name cell and the other columns (with optional rules between them). The header and every row go through here, so their columns always share the same boundaries. With vertical separators the row is framed by upright rules at its very left and right too, so the table's edge lines are solid from the header to the last row — as overlays: a fixed-width child at the end of a filling row misplaces itself in iced's flex, while a container aligned to the edge of a stack cannot.
+    /// The row template: selection box (when the boxes are shown), the Name cell and the other columns. The header and every row go through here, so their columns always share the same boundaries. `rules` draws the upright rules between the cells and frames the row with them at its very left and right, so the table's edge lines are solid from the header to the last row — as overlays: a fixed-width child at the end of a filling row misplaces itself in iced's flex, while a container aligned to the edge of a stack cannot. The caller passes the flag, which lets the header carry a grid the rows do not ([`HeaderOnly`](crate::Separators::HeaderOnly)).
     pub(super) fn template(
         &self,
         height: Length,
+        rules: bool,
         marker: Element<'a, Message, Theme, Renderer>,
         name: Element<'a, Message, Theme, Renderer>,
         cells: Vec<Element<'a, Message, Theme, Renderer>>,
@@ -203,12 +204,12 @@ where
         }
         row = row.push(cell(name, columns[0].width()));
         for (index, content) in cells.into_iter().enumerate() {
-            if self.separators.vertical() {
+            if rules {
                 row = row.push(self.vrule());
             }
             row = row.push(cell(content, columns[index + 1].width()));
         }
-        if !self.separators.vertical() {
+        if !rules {
             return row.into();
         }
         // The edge rules go on top as full-height overlays: a fixed child at the end of a filling row misplaces itself in iced's flex, but a container aligned to the edge of a stack cannot. The stack is as big as the row, so both rules span exactly the row's height.

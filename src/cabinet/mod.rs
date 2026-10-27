@@ -35,6 +35,8 @@ pub enum Separators {
     /// Plain rows, no lines.
     #[default]
     None,
+    /// Rules around and between the header cells only; the list itself stays plain.
+    HeaderOnly,
     /// A line between each item and below the last.
     Horizontal,
     /// A line between each column.
@@ -53,12 +55,18 @@ impl Separators {
     pub fn vertical(&self) -> bool {
         matches!(self, Self::Vertical | Self::Both)
     }
+
+    /// Whether the header row draws the upright rules between and around its cells: like the rows ([`vertical`](Self::vertical)), except for [`HeaderOnly`](Self::HeaderOnly), where the header is the only grid.
+    pub fn header_rules(&self) -> bool {
+        matches!(self, Self::HeaderOnly | Self::Vertical | Self::Both)
+    }
 }
 
 impl std::fmt::Display for Separators {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(match self {
             Self::None => "none",
+            Self::HeaderOnly => "header only",
             Self::Horizontal => "horizontal",
             Self::Vertical => "vertical",
             Self::Both => "both",
@@ -251,5 +259,35 @@ where
             );
         }
         body.into()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// `HeaderOnly` is the setting whose rules stop at the header: the header gets its grid, the rows stay plain.
+    #[test]
+    fn header_only_grids_the_header_and_nothing_else() {
+        assert!(Separators::HeaderOnly.header_rules());
+        assert!(!Separators::HeaderOnly.horizontal());
+        assert!(!Separators::HeaderOnly.vertical());
+    }
+
+    /// Everywhere else the header is gridded exactly like the rows.
+    #[test]
+    fn the_other_settings_grid_header_and_rows_alike() {
+        for separators in [
+            Separators::None,
+            Separators::Horizontal,
+            Separators::Vertical,
+            Separators::Both,
+        ] {
+            assert_eq!(
+                separators.header_rules(),
+                separators.vertical(),
+                "{separators} grids header and rows alike"
+            );
+        }
     }
 }
