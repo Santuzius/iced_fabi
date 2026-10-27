@@ -13,11 +13,11 @@ use crate::icon;
 
 /// Drop separators that do not divide two tools: leading, doubled-up and trailing ones fall away on their own, so a group whose tools were all left out takes its divider with them. Pure, so the collapsing rule is testable without a widget.
 fn prune_separators<'a, Message: Clone>(
-    items: &'a [ToolbarItem<'a, Message>],
+    items: &[&'a ToolbarItem<'a, Message>],
 ) -> Vec<&'a ToolbarItem<'a, Message>> {
     let mut kept: Vec<&ToolbarItem<'a, Message>> = Vec::new();
     for item in items {
-        match item {
+        match *item {
             ToolbarItem::Tool(_) => kept.push(item),
             ToolbarItem::Separator => {
                 if matches!(kept.last(), Some(ToolbarItem::Tool(_))) {
@@ -69,8 +69,20 @@ where
             );
         }
         let mut toolbar = row![].spacing(2).align_y(Alignment::Center);
+        // A tool the browser hides never enters the list, so its group's divider collapses along with it.
+        let visible: Vec<&ToolbarItem<_>> = self
+            .tools
+            .iter()
+            .filter(|item| match **item {
+                ToolbarItem::Tool(ref tool) => {
+                    let id = tool.id();
+                    id.is_empty() || !self.browser.is_tool_hidden(&id)
+                }
+                ToolbarItem::Separator => true,
+            })
+            .collect();
         // Separators only ever divide two tools: collapsed groups take their divider with them.
-        let items = prune_separators(&self.tools);
+        let items = prune_separators(&visible);
         for item in &items {
             toolbar = toolbar.push(match item {
                 ToolbarItem::Separator => self.divider(),
@@ -168,7 +180,8 @@ mod tests {
 
     /// How many tools and dividers survive the collapsing rule.
     fn kept(items: &[ToolbarItem<'static, ()>]) -> (usize, usize) {
-        let kept = prune_separators(items);
+        let refs: Vec<&ToolbarItem<'static, ()>> = items.iter().collect();
+        let kept = prune_separators(&refs);
         (
             kept.iter()
                 .filter(|i| matches!(i, ToolbarItem::Tool(_)))

@@ -23,7 +23,7 @@ use crate::{
     browser::Browser,
     icon::{RowIcons, TablerIcons},
     style::Style,
-    tool::Tool,
+    tool::{BuiltInTool, Tool},
 };
 
 pub use action::{ActionButton, ActionPlacement};
@@ -154,6 +154,17 @@ where
     pub fn tool_separator(mut self) -> Self {
         self.tools.push(ToolbarItem::Separator);
         self
+    }
+
+    /// Add the built-in set — [`BuiltInTool::Copy`] and [`BuiltInTool::Paste`], a divider, then [`BuiltInTool::Delete`] — the set most file lists start from. Each button enables itself from browser state (selection, [`has_clipboard`](crate::Browser::has_clipboard)), and every one of them is switchable through [`Browser::hide_tool`](crate::Browser::hide_tool); your own [`tool`](Self::tool)s go after. The message type names the built-ins through `impl From<BuiltInTool> for Message`.
+    pub fn built_in_tools(self) -> Self
+    where
+        Message: From<BuiltInTool>,
+    {
+        self.tool(BuiltInTool::Copy)
+            .tool(BuiltInTool::Paste)
+            .tool_separator()
+            .tool(BuiltInTool::Delete)
     }
 
     /// Show or hide the built-in browse/tree switch button; it sits by the breadcrumbs, a divider from the tools. Default: on.

@@ -1,6 +1,6 @@
 //! A cloud directory browser without the cloud: the listings come from a fake backend that answers every request one tick late, so the `activate → NeedsLoad → set_children` round-trip and its loading states behave like a real network drive.
 //!
-//! The bar above the cabinet demos the configuration hooks with dropdowns: the [`iced::Theme`] (including a reproduction of Syncative's palette and [`iced_fabi::Style`]), the file/folder [`iced_fabi::RowIcons`] (Tabler, or the vendored multicolour Material Icon Theme), the [`iced_fabi::Separators`] grid, the zebra stripe behind every second row, which entries are listed (all or folders only — file kinds are filtered code-side at init), how many entries the selection holds (many, one, or none), how the boxes appear (always, on long press, or hidden), and where the selection's action button sits (under the list, floating, or last in the toolbar); also what happens to toolbar tools that are not currently applicable (greyed out, or hidden outright). The toolbar itself shows the [`iced_fabi::Tool`] API (copy, paste, delete — in two groups divided by [`iced_fabi::Cabinet::tool_separator`], enabled per state, and copy/paste carries whole folder subtrees); selecting is done purely through the checkboxes. The column list gets one custom [`TypeColumn`], and a `Columns` dropdown switches which of the columns are drawn ([`Browser::hide_column`] / [`Browser::show_column`]; [`Browser::set_visible_columns`] is the same in one call at init).
+//! The bar above the cabinet demos the configuration hooks with dropdowns: the [`iced::Theme`] (including a reproduction of Syncative's palette and [`iced_fabi::Style`]), the file/folder [`iced_fabi::RowIcons`] (Tabler, or the vendored multicolour Material Icon Theme), the [`iced_fabi::Separators`] grid, the zebra stripe behind every second row, which entries are listed (all or folders only — file kinds are filtered code-side at init), how many entries the selection holds (many, one, or none), how the boxes appear (always, on long press, or hidden), and where the selection's action button sits (under the list, floating, or last in the toolbar); also what happens to toolbar tools that are not currently applicable (greyed out, or hidden outright). The toolbar itself shows the [`iced_fabi::Tool`] API: the built-in [`iced_fabi::BuiltInTool`] set (copy, paste, delete in two groups divided by [`iced_fabi::Cabinet::tool_separator`]) arrives with one `built_in_tools` call, the custom [`DuplicateHere`] is the demo's own `Tool` carrying a selection's subtree, and a `Tools` dropdown switches any of them off ([`Browser::hide_tool`](iced_fabi::Browser::hide_tool)); selecting is done purely through the checkboxes.checkboxes. The column list gets one custom [`TypeColumn`], and a `Columns` dropdown switches which of the columns are drawn ([`Browser::hide_column`] / [`Browser::show_column`]; [`Browser::set_visible_columns`] is the same in one call at init).
 //!
 //! Run: `cargo run --example cloud_browse` — then switch modes with the icon in the top right, tap folders to drill down, tap the boxes to select (press and hold a row first when "Boxes" is on *on long press*), and watch the parent markers turn into dots.
 
@@ -11,8 +11,8 @@ use iced::{
     widget::{column, container},
 };
 use iced_fabi::{
-    Browser, BuiltInColumn, Cell, Column, ColumnKey, ColumnWidth, Entry, EntryKind, Event, Node,
-    Outcome, tool,
+    Browser, BuiltInColumn, BuiltInTool, Cell, Column, ColumnKey, ColumnWidth, Entry, EntryKind,
+    Event, Node, Outcome, Tool, ToolKey,
 };
 
 fn main() -> iced::Result {
@@ -42,7 +42,20 @@ enum Message {
     Selection(SelectionChoice),
     Action(ActionChoice),
     ColumnToggle(usize),
+    ToolToggle(ToolKey),
+    Duplicate,
     Tick,
+}
+
+impl From<BuiltInTool> for Message {
+    /// The built-in toolbar buttons yield their variant; this maps them onto the demo's messages.
+    fn from(tool: BuiltInTool) -> Self {
+        match tool {
+            BuiltInTool::Copy => Self::Copy,
+            BuiltInTool::Paste => Self::Paste,
+            BuiltInTool::Delete => Self::Delete,
+        }
+    }
 }
 
 // --- the demo's configuration dropdowns ---
@@ -664,6 +677,8 @@ struct App {
     action: ActionChoice,
     /// The Columns dropdown's entries, refreshed whenever the columns change.
     column_options: Vec<ColumnOption>,
+    /// The Tools dropdown's entries, refreshed whenever the tools change.
+    tool_options: Vec<ToolOption>,
 }
 
 impl App {
@@ -676,6 +691,61 @@ impl App {
                 visible: !self.browser.is_column_hidden(index),
             })
             .collect();
+    }
+
+    /// Rebuild the Tools dropdown's entries: the library's built-in set and the demo's own tool, checked against the browser's hidden ids.
+    fn refresh_tools(&mut self) {
+        let mut options: Vec<ToolOption> = [BuiltInTool::Copy, BuiltInTool::Paste, BuiltInTool::Delete]
+            .into_iter()
+            .map(|tool| ToolOption {
+                key: ToolKey::from(tool),
+                label: tool.label().to_string(),
+                visible: !self.browser.is_tool_hidden(&tool.id()),
+            })
+            .collect();
+        options.push(ToolOption {
+            key: ToolKey::custom(DuplicateHere.id()),
+            label: "Duplicate".into(),
+            visible: !self.browser.is_tool_hidden(&DuplicateHere.id()),
+        });
+        self.tool_options = options;
+    }
+
+    /// The selected entries snapshotted with their subtrees, as the clipboard and a duplicate both need them.
+    fn snapshot_selection(&self) -> Vec<Copied> {
+        self.browser
+            .selected()
+            .filter_map(|id| {
+                let below = self.browser.path_below_root(id);
+                let name = (*below.last()?).to_string();
+                let parent = below[..below.len() - 1].join("/");
+                let entry = self
+                    .cloud
+                    .get(&parent)?
+                    .iter()
+                    .find(|entry| entry.name == name)?
+                    .clone();
+                Some(snapshot(&self.cloud, &parent, &entry))
+            })
+            .collect()
+    }
+
+    /// Land snapshots as copies in the current folder, each under a free copy name, subtree re-homed; used by Paste and by the demo's Duplicate tool.
+    fn put_copies(&mut self, copies: Vec<Copied>) {
+        let key = self
+            .browser
+            .path_below_root(self.browser.current())
+            .join("/");
+        let mut listing = self.cloud.get(&key).cloned().unwrap_or_default();
+        for copied in copies {
+            let mut top = copied;
+            top.entry.name = unique_copy_name(&top.entry.name, &listing);
+            listing.push(top.entry.clone());
+            // The subtree is re-homed at the renamed top; opening the copy later refetches these listings normally.
+            write_copy(&mut self.cloud, &key, &top);
+        }
+        self.cloud.insert(key.clone(), listing.clone());
+        self.browser.set_children(self.browser.current(), listing);
     }
     fn boot() -> (Self, Task<Message>) {
         let mut browser = Browser::new("My files");
@@ -706,8 +776,10 @@ impl App {
             selection: SelectionChoice::Multiple,
             action: ActionChoice::Wide,
             column_options: Vec::new(),
+            tool_options: Vec::new(),
         };
         app.refresh_columns();
+        app.refresh_tools();
         let task = Task::done(app.accept(outcome));
         (app, task)
     }
@@ -725,6 +797,15 @@ impl App {
                     self.browser.hide_column(column);
                 }
                 self.refresh_columns();
+                Task::none()
+            }
+            Message::ToolToggle(key) => {
+                if self.browser.is_tool_hidden(key.id()) {
+                    self.browser.show_tool(key);
+                } else {
+                    self.browser.hide_tool(key);
+                }
+                self.refresh_tools();
                 Task::none()
             }
             Message::Boxes(choice) => {
@@ -756,41 +837,22 @@ impl App {
                 Task::none()
             }
             Message::Copy => {
-                self.clipboard = self
-                    .browser
-                    .selected()
-                    .filter_map(|id| {
-                        let below = self.browser.path_below_root(id);
-                        let name = (*below.last()?).to_string();
-                        let parent = below[..below.len() - 1].join("/");
-                        let entry = self
-                            .cloud
-                            .get(&parent)?
-                            .iter()
-                            .find(|entry| entry.name == name)?
-                            .clone();
-                        Some(snapshot(&self.cloud, &parent, &entry))
-                    })
-                    .collect();
+                self.clipboard = self.snapshot_selection();
+                // The built-in Paste button reads this flag; the file data itself stays in the fake cloud.
+                self.browser.set_has_clipboard(!self.clipboard.is_empty());
                 // A tool that acted is done acting: the boxes go back to empty.
                 self.browser.clear_selection();
                 Task::none()
             }
             Message::Paste => {
-                let key = self
-                    .browser
-                    .path_below_root(self.browser.current())
-                    .join("/");
-                let mut listing = self.cloud.get(&key).cloned().unwrap_or_default();
-                for copied in self.clipboard.clone() {
-                    let mut top = copied;
-                    top.entry.name = unique_copy_name(&top.entry.name, &listing);
-                    listing.push(top.entry.clone());
-                    // The subtree is re-homed at the renamed top; opening the copy later refetches these listings normally.
-                    write_copy(&mut self.cloud, &key, &top);
-                }
-                self.cloud.insert(key.clone(), listing.clone());
-                self.browser.set_children(self.browser.current(), listing);
+                self.put_copies(self.clipboard.clone());
+                self.browser.clear_selection();
+                Task::none()
+            }
+            Message::Duplicate => {
+                // The demo's custom tool: copy and paste in one step — the selection lands back beside itself under a copy name.
+                let copies = self.snapshot_selection();
+                self.put_copies(copies);
                 self.browser.clear_selection();
                 Task::none()
             }
@@ -941,6 +1003,23 @@ impl App {
                 list.into()
             }
         }
+        fn tools_list<'a>(options: &'a [ToolOption], syncative: bool) -> Element<'a, Message> {
+            let list = iced::widget::pick_list(
+                options,
+                None::<&ToolOption>,
+                |option| Message::ToolToggle(option.key.clone()),
+            )
+            .width(Length::Fixed(150.0))
+            .placeholder("pick tools");
+            if syncative {
+                list.text_size(SYNCATIVE_TEXT)
+                    .style(syncative_pick_list)
+                    .menu_style(syncative_menu)
+                    .into()
+            } else {
+                list.into()
+            }
+        }
         let bar = iced::widget::column![
             iced::widget::text(title).size(if syncative { 24 } else { 20 }),
             iced::widget::row![
@@ -992,6 +1071,8 @@ impl App {
                     120.0,
                     syncative
                 ),
+                label("Tools"),
+                tools_list(&self.tool_options, syncative),
             ]
             .spacing(8)
             .align_y(iced::Alignment::Center),
@@ -1030,22 +1111,23 @@ impl App {
                 .text_size(SYNCATIVE_TEXT)
                 .scrollbar(syncative_scroll_direction(), syncative_scrollbar);
         }
-        // Two tool groups — clipboard and delete — divided by a thin upright line; selection itself is driven only by the checkboxes. With "hidden" inactive tools a whole group can be missing; the cabinet then drops the stray dividers itself.
-        if show(has_selection) {
-            cabinet = cabinet.tool(
-                tool(icondata::TbCopyOutline, |_| Message::Copy).when(move |_| has_selection),
-            );
+        // The library's built-in set — Copy, Paste, a divider, Delete — in one call; each button greys itself from browser state (selection, the clipboard flag), and the Tools dropdown switches any of them off entirely. The demo's own `DuplicateHere` joins the second group; with "hidden" inactive tools the app leaves out what does not apply instead, and since the built-ins are plain values that works one by one — the cabinet drops the stray dividers itself.
+        if self.inactive == InactiveChoice::GreyedOut {
+            cabinet = cabinet.built_in_tools();
+        } else {
+            if show(has_selection) {
+                cabinet = cabinet.tool(BuiltInTool::Copy);
+            }
+            if show(has_clipboard) {
+                cabinet = cabinet.tool(BuiltInTool::Paste);
+            }
+            cabinet = cabinet.tool_separator();
+            if show(has_selection) {
+                cabinet = cabinet.tool(BuiltInTool::Delete);
+            }
         }
-        if show(has_clipboard) {
-            cabinet = cabinet.tool(
-                tool(icondata::TbClipboardFilled, |_| Message::Paste).when(move |_| has_clipboard),
-            );
-        }
-        cabinet = cabinet.tool_separator();
         if show(has_selection) {
-            cabinet = cabinet.tool(
-                tool(icondata::TbTrashOutline, |_| Message::Delete).when(move |_| has_selection),
-            );
+            cabinet = cabinet.tool(DuplicateHere);
         }
         // The selection's action button: text and message are the app's, placement is picked in the bar.
         if show(has_selection) {
@@ -1112,6 +1194,42 @@ impl fmt::Display for ColumnOption {
 }
 
 struct TypeColumn;
+
+/// One entry of the Tools dropdown: which tool it stands for, and how it reads there (a check mark for a drawn tool, a cross for a hidden one).
+#[derive(Clone, PartialEq)]
+struct ToolOption {
+    key: ToolKey,
+    label: String,
+    visible: bool,
+}
+
+impl fmt::Display for ToolOption {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(if self.visible { "✓ " } else { "✗ " })?;
+        f.write_str(&self.label)
+    }
+}
+
+/// The demo's own toolbar tool — the bar-side counterpart of the custom column: the [`iced_fabi::Tool`] implementation supplies glyph, switch id, applicability and message; the id is what [`Browser::hide_tool`](iced_fabi::Browser::hide_tool) and the Tools dropdown match on. What the click does (copy and paste in one step) is entirely the demo's.
+struct DuplicateHere;
+
+impl Tool<Message> for DuplicateHere {
+    fn glyph(&self) -> icondata::Icon {
+        icondata::TbCopyPlusOutline
+    }
+
+    fn id(&self) -> String {
+        "duplicate".into()
+    }
+
+    fn enabled(&self, browser: &Browser) -> bool {
+        browser.has_selection()
+    }
+
+    fn message(&self, _browser: &Browser) -> Message {
+        Message::Duplicate
+    }
+}
 
 impl Column for TypeColumn {
     fn header(&self) -> String {

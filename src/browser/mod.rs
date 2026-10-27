@@ -22,6 +22,7 @@ use std::collections::{HashMap, HashSet};
 use crate::{
     column::{Column, ColumnKey, ModifiedColumn, NameColumn, SizeColumn},
     event::Event,
+    tool::ToolKey,
 };
 
 /// The consequence of a [`Browser`] action, telling the application what it must do next.
@@ -70,6 +71,10 @@ pub struct Browser {
     pub(super) columns: Vec<Box<dyn Column>>,
     /// Parallel to [`columns`](Self::columns): a column whose flag is set is not drawn — header cell, body cells and its upright rule all stop; index 0 is never hidden.
     pub(super) hidden: Vec<bool>,
+    /// Whether the app's clipboard holds something: only the app knows (the library carries no file data), and this flag is its answer, driving the built-in [`Paste`](crate::BuiltInTool::Paste).
+    pub(super) has_clipboard: bool,
+    /// Ids of tools taken out of the toolbar ([`hide_tool`](Self::hide_tool)); an empty tool id is never in here, so anonymous tools always draw.
+    pub(super) hidden_tools: HashSet<String>,
 }
 
 // Boxed columns are not Debug, so Browser cannot derive it.
@@ -92,6 +97,8 @@ impl std::fmt::Debug for Browser {
             .field("mode", &self.mode)
             .field("columns", &self.columns.len())
             .field("hidden", &self.hidden)
+            .field("has_clipboard", &self.has_clipboard)
+            .field("hidden_tools", &self.hidden_tools)
             .finish()
     }
 }
@@ -134,6 +141,8 @@ impl Browser {
                 Box::new(SizeColumn::new()),
             ],
             hidden: vec![false; 3],
+            has_clipboard: false,
+            hidden_tools: HashSet::new(),
         }
     }
 
@@ -284,5 +293,33 @@ impl Browser {
         for (index, column) in self.columns.iter().enumerate().skip(1) {
             self.hidden[index] = !wanted.contains(&column.id());
         }
+    }
+
+    /// Tell the browser whether the app's clipboard currently holds something: the only thing the library can know about it (the file data itself stays with the app), and what enables the built-in [`Paste`](crate::BuiltInTool::Paste) button.
+    pub fn set_has_clipboard(&mut self, has: bool) {
+        self.has_clipboard = has;
+    }
+
+    /// Whether a [clipboard](Self::set_has_clipboard) was announced.
+    pub fn has_clipboard(&self) -> bool {
+        self.has_clipboard
+    }
+
+    /// Take a named tool out of the toolbar: it stops being drawn wherever the app adds it, and a group left without tools takes its divider with it. Tools are named, not counted: [`ToolKey`] from a [`BuiltInTool`](crate::BuiltInTool) variant or from the [`id`](crate::Tool::id) a custom tool returns. A tool without an id (the [`Tool`](crate::Tool) default) cannot be hidden.
+    pub fn hide_tool(&mut self, tool: impl Into<ToolKey>) {
+        let key = tool.into();
+        if !key.id().is_empty() {
+            self.hidden_tools.insert(key.id().to_owned());
+        }
+    }
+
+    /// Put a [hidden](Self::hide_tool) tool back into the toolbar.
+    pub fn show_tool(&mut self, tool: impl Into<ToolKey>) {
+        self.hidden_tools.remove(tool.into().id());
+    }
+
+    /// Whether the toolbar leaves this tool id out.
+    pub fn is_tool_hidden(&self, id: &str) -> bool {
+        self.hidden_tools.contains(id)
     }
 }
