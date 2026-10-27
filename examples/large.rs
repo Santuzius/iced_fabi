@@ -160,6 +160,12 @@ fn main() {
         || build(&hidden),
     );
 
+    let mut by_size = big_folder();
+    by_size.sort_by_column(2);
+    measure("build browse 10k by size", browse_rows, RUNS, || {
+        build(&by_size);
+    });
+
     let (tree, nodes) = deep_tree();
     let tree_rows = listed_rows(&tree);
     assert_eq!(

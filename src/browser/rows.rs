@@ -4,7 +4,7 @@ use std::cmp::Ordering;
 
 use super::{Browser, Node, NodeId, node::EntryKind};
 use crate::browser::Mode;
-use crate::natural::name_key;
+use crate::natural::{NameChunk, name_key};
 
 /// One line of the list: which node, how deep it sits (tree mode indents by this), and how its controls look. The view builds rows for browse mode and tree mode alike, so it never branches on the mode itself.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -131,14 +131,16 @@ impl Browser {
 
     /// The children of `id` in display order, by the sorted column ([`Column::compare`](crate::Column::compare)), ties broken by name; `folders_first` wins over both.
     fn sorted(&self, children: &[NodeId]) -> Vec<NodeId> {
-        let mut nodes: Vec<&Node> = children
+        // The name key is built once per child, not once per comparison: 10 000 children are compared about 130 000 times, and `name_key` allocates.
+        let mut nodes: Vec<(&Node, Vec<NameChunk>)> = children
             .iter()
             .filter_map(|id| self.nodes.get(id))
+            .map(|node| (node, name_key(&node.name)))
             .collect();
         let column = &self.columns[self.sort_column.min(self.columns.len() - 1)];
         let ascending = self.sort_ascending;
         let folders_first = self.folders_first;
-        nodes.sort_by(|a, b| {
+        nodes.sort_by(|(a, name_a), (b, name_b)| {
             if folders_first && a.kind != b.kind {
                 return match (a.kind, b.kind) {
                     (EntryKind::Folder, _) => Ordering::Less,
@@ -149,8 +151,8 @@ impl Browser {
             let by_key = column.compare(a, b);
             let ordered = if ascending { by_key } else { by_key.reverse() };
             // Equal keys (and unsortable columns) fall back to name so the order is stable.
-            ordered.then_with(|| name_key(&a.name).cmp(&name_key(&b.name)))
+            ordered.then_with(|| name_a.cmp(name_b))
         });
-        nodes.iter().map(|node| node.id).collect()
+        nodes.iter().map(|(node, _)| node.id).collect()
     }
 }
