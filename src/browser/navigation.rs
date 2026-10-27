@@ -40,6 +40,7 @@ impl Browser {
     }
 
     /// Node names from the root down to `id` — enough to rebuild the backend's path.
+    /// An id the browser does not know gives an empty chain.
     pub fn name_chain(&self, id: NodeId) -> Vec<&str> {
         let mut chain = Vec::new();
         let mut here = Some(id);
@@ -51,10 +52,9 @@ impl Browser {
         chain
     }
 
-    /// The names from the root's children down to `id` — the path a backend expects, without the root's display name (the root itself gives an empty path). Same order as [`name_chain`](Self::name_chain) minus its first element, so the two joined with `/` are the backend key.
+    /// The names from the root's children down to `id` — the path a backend expects, without the root's display name (the root itself gives an empty path, and so does an id the browser does not know). Same order as [`name_chain`](Self::name_chain) minus its first element, so the two joined with `/` are the backend key.
     pub fn path_below_root(&self, id: NodeId) -> Vec<&str> {
-        let all = self.name_chain(id);
-        all[1..].to_vec()
+        self.name_chain(id).into_iter().skip(1).collect()
     }
 
     /// Whether this folder's branch is open in tree mode.

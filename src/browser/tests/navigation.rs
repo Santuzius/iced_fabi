@@ -43,6 +43,15 @@ fn path_below_root_skips_the_root_display_name() {
 }
 
 #[test]
+fn path_below_root_of_an_unknown_id_is_empty() {
+    assert_eq!(
+        Browser::new("r").path_below_root(NodeId(42)),
+        Vec::<&str>::new(),
+        "an id the browser never heard of gives the empty path, not a panic"
+    );
+}
+
+#[test]
 fn a_scope_under_a_selected_ancestor_shares_its_selection() {
     let mut browser = Browser::sample();
     let folder = NodeId::derive(NodeId::ROOT, EntryKind::Folder, "Finanzen");
