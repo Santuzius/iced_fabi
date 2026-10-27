@@ -19,9 +19,12 @@ pub enum ActionPlacement {
     WideCenter,
     /// Floating over the rows in the cabinet's bottom-right corner.
     Floating,
-    /// As the last item of the toolbar, before the mode switch.
+    /// As the last item of the toolbar, right of the tool groups.
     ToolbarEnd,
 }
+
+/// Corner radius, in px, that renders as completely round corners. Both iced 0.14 renderers clamp every corner radius to half the shorter side of the box before drawing it (tiny-skia: `iced_tiny_skia::engine::Engine::draw_quad`, "Make sure the border radius is not larger than the bounds"; wgpu: `iced_wgpu`'s `shader/quad/solid.wgsl`), so one value larger than the tallest button the cabinet draws is enough — and it needs neither the button's height (which differs by [`ActionPlacement`]) nor the renderer's default text size, which a style closure never sees (only `(&Theme, Status)` arrives there).
+const ROUND_PILL: f32 = 1_000.0;
 
 /// An enable rule as [`when`](ActionButton::when) stores it.
 type WhenRule<'a> = Rc<dyn Fn(&Browser) -> bool + 'a>;
@@ -68,7 +71,7 @@ where
         + iced_widget::core::Renderer
         + 'a,
 {
-    /// The action button as an element, styled like Syncative's `button_primary`: an accent-filled pill with the [`on_accent`](crate::Style::on_accent) label and a same-colour 1-px border; hover swaps in [`accent_hover`](crate::Style::accent_hover), and pressed is the base again. The corners are completely round (a radius of half the button's height). Without a selection it sits greyed like an inactive tool: the fill, label and border at 50 %, 45 % and 50 % alpha, and no click. `placement` sizes it: full-width and centred text under the list, content-sized and compact in the toolbar.
+    /// The action button as an element, styled like Syncative's `button_primary`: an accent-filled pill with the [`on_accent`](crate::Style::on_accent) label and a same-colour 1-px border; hover swaps in [`accent_hover`](crate::Style::accent_hover), and pressed is the base again. The corners are completely round (the radius is clamped by the renderer to half the button's height). Without a selection it sits greyed like an inactive tool: the fill, label and border at 50 %, 45 % and 50 % alpha, and no click. `placement` sizes it: full-width and centred text under the list, content-sized and compact in the toolbar.
     pub(super) fn action_button_element(
         &self,
         action: &ActionButton<'a, Message>,
@@ -99,7 +102,6 @@ where
             btn = btn.on_press(action.on_press.clone());
         }
         let style = Rc::clone(&self.style);
-        let text_size = self.text_size.unwrap_or_default();
         btn.style(move |theme, status| {
             let appearance = style(theme);
             let ghost = status == button::Status::Disabled;
@@ -109,8 +111,8 @@ where
                 appearance.accent
             };
             let fade = |c: Color, a: f32| Color { a, ..c };
-            // Half the button's own height (text + vertical padding) makes the corners completely round.
-            let pill = (text_size.0 + 16.0) / 2.0;
+            // Completely round corners at any placement and text size: the renderer clamps this to half the button's height.
+            let pill = ROUND_PILL;
             button::Style {
                 background: Some(Background::Color(fade(bg, if ghost { 0.5 } else { 1.0 }))),
                 text_color: fade(appearance.on_accent, if ghost { 0.45 } else { 1.0 }),
