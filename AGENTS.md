@@ -2,6 +2,10 @@
 
 Read [doc/README.md](doc/README.md) and the page matching the task before you start: conventions, architecture and research results are there. Keep what you learn about this project in `doc/`, not in an agent's memory.
 
+## Writing in `doc/`
+
+One line per entry: what the part is for and what to look for in it, as in `doc/architecture.md`. Why a choice was made — an iced quirk it works around, a colour rule — belongs in the code's doc comments and the commit message.
+
 ## Checking a UI change on screen
 
 `agent-screenshot` runs `examples/cloud_browse.rs` on a private Xvfb screen and saves a PNG of its window. From the repo root, one xdotool step per argument, `$WID` the window:
