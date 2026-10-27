@@ -115,7 +115,10 @@ fn setting_and_adding_columns_resets_or_extends_visibility() {
 
 #[test]
 fn the_built_in_enum_dispatches_like_the_structs() {
-    assert_eq!(BuiltInColumn::Name.header(), crate::NameColumn::new().header());
+    assert_eq!(
+        BuiltInColumn::Name.header(),
+        crate::NameColumn::new().header()
+    );
     assert_eq!(BuiltInColumn::Modified.id(), ModifiedColumn::new().id());
     assert_eq!(BuiltInColumn::Size.width(), SizeColumn::new().width());
 }

@@ -695,14 +695,15 @@ impl App {
 
     /// Rebuild the Tools dropdown's entries: the library's built-in set and the demo's own tool, checked against the browser's hidden ids.
     fn refresh_tools(&mut self) {
-        let mut options: Vec<ToolOption> = [BuiltInTool::Copy, BuiltInTool::Paste, BuiltInTool::Delete]
-            .into_iter()
-            .map(|tool| ToolOption {
-                key: ToolKey::from(tool),
-                label: tool.label().to_string(),
-                visible: !self.browser.is_tool_hidden(&tool.id()),
-            })
-            .collect();
+        let mut options: Vec<ToolOption> =
+            [BuiltInTool::Copy, BuiltInTool::Paste, BuiltInTool::Delete]
+                .into_iter()
+                .map(|tool| ToolOption {
+                    key: ToolKey::from(tool),
+                    label: tool.label().to_string(),
+                    visible: !self.browser.is_tool_hidden(&tool.id()),
+                })
+                .collect();
         options.push(ToolOption {
             key: ToolKey::custom(DuplicateHere.id()),
             label: "Duplicate".into(),
@@ -987,11 +988,9 @@ impl App {
             }
         }
         fn columns_list<'a>(options: &'a [ColumnOption], syncative: bool) -> Element<'a, Message> {
-            let list = iced::widget::pick_list(
-                options,
-                None::<&ColumnOption>,
-                |option| Message::ColumnToggle(option.index),
-            )
+            let list = iced::widget::pick_list(options, None::<&ColumnOption>, |option| {
+                Message::ColumnToggle(option.index)
+            })
             .width(Length::Fixed(150.0))
             .placeholder("pick columns");
             if syncative {
@@ -1004,11 +1003,9 @@ impl App {
             }
         }
         fn tools_list<'a>(options: &'a [ToolOption], syncative: bool) -> Element<'a, Message> {
-            let list = iced::widget::pick_list(
-                options,
-                None::<&ToolOption>,
-                |option| Message::ToolToggle(option.key.clone()),
-            )
+            let list = iced::widget::pick_list(options, None::<&ToolOption>, |option| {
+                Message::ToolToggle(option.key.clone())
+            })
             .width(Length::Fixed(150.0))
             .placeholder("pick tools");
             if syncative {

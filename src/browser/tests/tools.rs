@@ -32,14 +32,23 @@ fn the_built_ins_enable_from_browser_state() {
     let notes = NodeId::derive(NodeId::ROOT, EntryKind::File, "notes.txt");
     let mut browser = browser;
     browser.toggle(notes);
-    assert!(<BuiltInTool as Tool<Msg>>::enabled(&BuiltInTool::Copy, &browser));
-    assert!(<BuiltInTool as Tool<Msg>>::enabled(&BuiltInTool::Delete, &browser));
+    assert!(<BuiltInTool as Tool<Msg>>::enabled(
+        &BuiltInTool::Copy,
+        &browser
+    ));
+    assert!(<BuiltInTool as Tool<Msg>>::enabled(
+        &BuiltInTool::Delete,
+        &browser
+    ));
     assert!(
         !<BuiltInTool as Tool<Msg>>::enabled(&BuiltInTool::Paste, &browser),
         "the clipboard belongs to the app"
     );
     browser.set_has_clipboard(true);
-    assert!(<BuiltInTool as Tool<Msg>>::enabled(&BuiltInTool::Paste, &browser));
+    assert!(<BuiltInTool as Tool<Msg>>::enabled(
+        &BuiltInTool::Paste,
+        &browser
+    ));
     assert_eq!(
         <BuiltInTool as Tool<Msg>>::message(&BuiltInTool::Copy, &browser),
         Msg,

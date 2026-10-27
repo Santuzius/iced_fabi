@@ -355,7 +355,9 @@ mod tests {
         );
         let third = 1.0 - (1.0 - 0.92) / 3.0;
         assert!(
-            (stripe.r - third).abs() < 1e-3 && (stripe.g - third).abs() < 1e-3 && (stripe.b - third).abs() < 1e-3,
+            (stripe.r - third).abs() < 1e-3
+                && (stripe.g - third).abs() < 1e-3
+                && (stripe.b - third).abs() < 1e-3,
             "a capped subtle stripe sits a third of the way to the header"
         );
     }

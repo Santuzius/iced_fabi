@@ -186,7 +186,10 @@ where
                         let appearance = style(theme);
                         let background = if selected {
                             Some(appearance.selection)
-                        } else if matches!(status, button::Status::Hovered | button::Status::Pressed) {
+                        } else if matches!(
+                            status,
+                            button::Status::Hovered | button::Status::Pressed
+                        ) {
                             Some(appearance.row_hover)
                         } else if stripe && appearance.stripe > 0.0 {
                             Some(super::paint::stripe_of(
