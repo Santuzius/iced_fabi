@@ -184,6 +184,7 @@ where
                 } else if stripe && appearance.stripe > 0.0 {
                     Some(super::paint::stripe_of(
                         appearance.background,
+                        appearance.header,
                         appearance.stripe,
                     ))
                 } else {

@@ -236,14 +236,40 @@ where
     }
 }
 
+/// A [`Style::stripe`] factor up to this reads as a subtle stripe, which stays strictly lighter than the header (see [`stripe_of`]).
+const SUBTLE_STRIPE_MAX: f32 = 0.2;
+/// How much of the background-to-header distance a subtle stripe may use (a third, so its lightness step is of the same order on light and dark backgrounds); the rest keeps the header distinct from the rows.
+const SUBTLE_HEADER_SHARE: f32 = 1.0 / 3.0;
+
 /// The zebra background for one background colour at the given [`Style::stripe`] factor: the row darkens by this fraction of its own colour — proportional, so one factor reads with equal strength on dark and on light backgrounds. Only a background so dark that it has no room left to darken shifts towards white instead.
-pub(super) fn stripe_of(background: Color, stripe: f32) -> Color {
-    let towards = if (background.r + background.g + background.b) / 3.0 < 0.12 {
-        Color::WHITE
+///
+/// The header bounds the stripe, so the header stays the strongest surface of the table: a factor reaching past the [`Style::header`] colour stops right at it, a subtle factor (at most [`SUBTLE_STRIPE_MAX`]) uses at most a third of the background-to-header distance — a subtle stripe in the header's own colour would read as a stray header row, and near it would read almost as dark on a light background. A header that does not stand off the background in the stripe's direction bounds nothing.
+pub(super) fn stripe_of(background: Color, header: Color, stripe: f32) -> Color {
+    let average = |color: Color| (color.r + color.g + color.b) / 3.0;
+    let lightening = average(background) < 0.12;
+    let (towards, room) = if lightening {
+        (Color::WHITE, 1.0 - average(background))
     } else {
-        Color::BLACK
+        (Color::BLACK, average(background))
     };
-    crate::style::mix(background, towards, stripe)
+    // How far the stripe would have to go towards `towards` to reach the header's own lightness.
+    let to_header = if lightening {
+        average(header) - average(background)
+    } else {
+        average(background) - average(header)
+    };
+    let factor = if to_header <= 0.0 {
+        stripe
+    } else {
+        let to_header = to_header / room;
+        let limit = if stripe <= SUBTLE_STRIPE_MAX {
+            to_header * SUBTLE_HEADER_SHARE
+        } else {
+            to_header
+        };
+        stripe.min(limit)
+    };
+    crate::style::mix(background, towards, factor)
 }
 
 fn length(width: ColumnWidth) -> Length {
@@ -263,14 +289,14 @@ mod tests {
     #[test]
     fn stripes_stay_visible_on_light_and_dark_backgrounds() {
         let white = Color::from_rgb(1.0, 1.0, 1.0);
-        let light = stripe_of(white, 0.12);
+        let light = stripe_of(white, Color::from_rgb(0.5, 0.5, 0.5), 0.12);
         assert!(
             light.r < 1.0 && light.g < 1.0 && light.b < 1.0,
             "light stripes must darken"
         );
 
         let dark = Color::from_rgb(0.16, 0.17, 0.18);
-        let darker = stripe_of(dark, 0.12);
+        let darker = stripe_of(dark, Color::from_rgb(0.1, 0.11, 0.12), 0.12);
         assert!(
             darker.r < dark.r && darker.g < dark.g && darker.b < dark.b,
             "dark stripes keep darkening as they always did"
@@ -278,8 +304,51 @@ mod tests {
 
         let near_black = Color::from_rgb(0.02, 0.02, 0.02);
         assert!(
-            stripe_of(near_black, 0.12).r > near_black.r,
+            stripe_of(near_black, near_black, 0.12).r > near_black.r,
             "a near-black background must lighten its rows instead"
+        );
+    }
+
+    /// No row may darken past the header, so the header stays the strongest surface: a strong factor reaching past it lands exactly on the header colour.
+    #[test]
+    fn strong_stripes_stop_at_the_header() {
+        let white = Color::from_rgb(1.0, 1.0, 1.0);
+        let header = Color::from_rgb(0.92, 0.92, 0.92);
+        let stripe = stripe_of(white, header, 0.35);
+        assert!(
+            (stripe.r - 0.92).abs() < 1e-6
+                && (stripe.g - 0.92).abs() < 1e-6
+                && (stripe.b - 0.92).abs() < 1e-6,
+            "a strong stripe must land on the header, not past it"
+        );
+    }
+
+    /// The other half of the rule: a subtle factor must stay strictly lighter than the header — in the header's own colour it would read as a stray header row — and it stops at a third of the background-to-header distance, which keeps its lightness step small on light backgrounds.
+    #[test]
+    fn subtle_stripes_stay_lighter_than_the_header() {
+        let white = Color::from_rgb(1.0, 1.0, 1.0);
+        let header = Color::from_rgb(0.92, 0.92, 0.92);
+        let stripe = stripe_of(white, header, 0.12);
+        assert!(
+            stripe.r > 0.92 && stripe.g > 0.92 && stripe.b > 0.92,
+            "a subtle stripe must stay lighter than the header"
+        );
+        let third = 1.0 - (1.0 - 0.92) / 3.0;
+        assert!(
+            (stripe.r - third).abs() < 1e-3 && (stripe.g - third).abs() < 1e-3 && (stripe.b - third).abs() < 1e-3,
+            "a capped subtle stripe sits a third of the way to the header"
+        );
+    }
+
+    /// A header lighter than the background (the usual dark-theme band) leaves a darkening stripe unbounded.
+    #[test]
+    fn a_lighter_header_bounds_nothing() {
+        let dark = Color::from_rgb(0.16, 0.17, 0.18);
+        let header = Color::from_rgb(0.2, 0.21, 0.22);
+        let stripe = stripe_of(dark, header, 0.35);
+        assert!(
+            stripe.r < dark.r * 0.66 && stripe.g < dark.g * 0.66,
+            "the full factor must still apply"
         );
     }
 }
