@@ -123,7 +123,7 @@ where
         )
     }
 
-    /// One list row: the whole row is a button (activate) that highlights under the pointer, with the box and the caret as buttons of their own on top.
+    /// One list row: a layer behind the content carries the row's colour (selection, hover, zebra stripe) and the activate click, highlighting under the pointer; the box and the caret are buttons of their own inside that content.
     fn line(&self, row: &Row, tree: bool, stripe: bool) -> Element<'a, Message, Theme, Renderer> {
         let node = self
             .browser
@@ -174,32 +174,41 @@ where
         );
         let selected = row.marker == Marker::Selected;
         let style = Rc::clone(&self.style);
-        let line: Element<'a, Message, Theme, Renderer> = button(content)
-            .width(Length::Fill)
-            .padding(0)
-            .style(move |theme, status| {
-                let appearance = style(theme);
-                let background = if selected {
-                    Some(appearance.selection)
-                } else if matches!(status, button::Status::Hovered | button::Status::Pressed) {
-                    Some(appearance.row_hover)
-                } else if stripe && appearance.stripe > 0.0 {
-                    Some(super::paint::stripe_of(
-                        appearance.background,
-                        appearance.header,
-                        appearance.stripe,
-                    ))
-                } else {
-                    None
-                };
-                button::Style {
-                    background: background.map(Background::Color),
-                    text_color: appearance.text,
-                    ..button::Style::default()
-                }
-            })
-            .on_press((self.on_event)(crate::Event::RowPressed(row.id)))
-            .into();
+        // One layer behind the content carries the row's colour and the activate click, kept clear of the box's edge so the host's frame line survives (see `paint::FRAME`). The box and caret buttons sit inside that content, so their press still reaches them before the row's: a `Button` forwards the event to its content and stops once it is captured.
+        let line: Element<'a, Message, Theme, Renderer> = iced_widget::stack![
+            self.framed(
+                Length::Fixed(ROW_HEIGHT),
+                button(Space::new().width(Length::Fill).height(Length::Fill))
+                    .width(Length::Fill)
+                    .height(Length::Fill)
+                    .padding(0)
+                    .style(move |theme, status| {
+                        let appearance = style(theme);
+                        let background = if selected {
+                            Some(appearance.selection)
+                        } else if matches!(status, button::Status::Hovered | button::Status::Pressed) {
+                            Some(appearance.row_hover)
+                        } else if stripe && appearance.stripe > 0.0 {
+                            Some(super::paint::stripe_of(
+                                appearance.background,
+                                appearance.header,
+                                appearance.stripe,
+                            ))
+                        } else {
+                            None
+                        };
+                        button::Style {
+                            background: background.map(Background::Color),
+                            ..button::Style::default()
+                        }
+                    })
+                    .on_press((self.on_event)(crate::Event::RowPressed(row.id)))
+                    .into(),
+            ),
+            content,
+        ]
+        .width(Length::Fill)
+        .into();
         if self.browser.checkboxes() == crate::Checkboxes::OnLongPress && !self.browser.is_armed() {
             // While the boxes are hidden, a transparent layer on top of the row records press and release.
             // Stack children are handled top-down, so `HoldEnded` reaches the app before the row's own

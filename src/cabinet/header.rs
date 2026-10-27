@@ -56,13 +56,17 @@ where
                 headers,
             )
         };
+        // The colour band sits behind the content and stops 1 px short of the box's edges, so the host's frame line stays visible (see `paint::FRAME`).
         let style = Rc::clone(&self.style);
-        container(content)
+        let band = container(Space::new().width(Length::Fill).height(Length::Fill))
             .width(Length::Fill)
+            .height(Length::Fill)
             .style(move |theme: &Theme| container::Style {
                 background: Some(Background::Color(style(theme).header)),
                 ..container::Style::default()
-            })
+            });
+        iced_widget::stack![self.framed(Length::Fixed(ROW_HEIGHT), band.into()), content]
+            .width(Length::Fill)
             .into()
     }
 

@@ -1,0 +1,4 @@
+# iced 0.14 notes
+
+- A `container` paints background and border as one quad, then its child on top, and its layout reserves `padding` but not the border width (`iced_widget-0.14.2/src/container.rs`: `layout`, `draw`, `draw_background`). A child reaching the container's edge covers the border, so a bordered card around the cabinet loses its side lines to the row and header backgrounds. The cabinet therefore keeps the outermost pixel column of its box free of those backgrounds (`cabinet/paint.rs`: `FRAME`, `framed`) and draws its own upright edge rules on that same strip, so with `Separators::Vertical` or `Both` one line shows, not two. The pixel check: a zebra row had painted its stripe colour where the card's border pixel should be.
+- A fixed-width child at the end of a filling row misplaces itself in iced's flex, so the table's left and right edge rules are stack overlays in `cabinet/paint.rs`.

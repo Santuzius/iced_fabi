@@ -19,6 +19,8 @@ pub(super) const BAR_HEIGHT: f32 = 44.0;
 pub(super) const ROW_HEIGHT: f32 = 36.0;
 /// Inset of the first and last cell from the cabinet's edges.
 pub(super) const EDGE: f32 = 8.0;
+/// The strip the cabinet keeps free of its own backgrounds at the left and right of its box. The host draws its frame there — a card's 1-px border — and iced paints a container's child over that border, so a row or header background reaching the edge would cut that line (see `doc/iced-notes.md`).
+pub(super) const FRAME: f32 = 1.0;
 /// The selection box column at the left edge.
 pub(super) const MARKER_CELL: f32 = 36.0;
 /// Horizontal padding inside every column cell, header and rows alike.
@@ -177,7 +179,20 @@ where
             .into()
     }
 
-    /// The row template: selection box (when the boxes are shown), the Name cell and the other columns. The header and every row go through here, so their columns always share the same boundaries. `rules` draws the upright rules between the cells and frames the row with them at its very left and right, so the table's edge lines are solid from the header to the last row — as overlays: a fixed-width child at the end of a filling row misplaces itself in iced's flex, while a container aligned to the edge of a stack cannot. The caller passes the flag, which lets the header carry a grid the rows do not ([`HeaderOnly`](crate::Separators::HeaderOnly)).
+    /// A background layer sized to the row's box but kept [`FRAME`] clear of its left and right edge, so the frame line the host draws there stays visible. Header and rows place their colour (the header band, the stripe, the hover and selection fill) on such a layer behind their content.
+    pub(super) fn framed(
+        &self,
+        height: Length,
+        layer: Element<'a, Message, Theme, Renderer>,
+    ) -> Element<'a, Message, Theme, Renderer> {
+        container(layer)
+            .width(Length::Fill)
+            .height(height)
+            .padding([0.0, FRAME])
+            .into()
+    }
+
+    /// The row template: selection box (when the boxes are shown), the Name cell and the other columns. The header and every row go through here, so their columns always share the same boundaries. `rules` draws the upright rules between the cells and frames the row with them at its very left and right, so the table's edge lines are solid from the header to the last row — on the [`FRAME`](super::paint::FRAME) strip itself, where the host's frame line sits, and as overlays: a fixed-width child at the end of a filling row misplaces itself in iced's flex, while a container aligned to the edge of a stack cannot. The caller passes the flag, which lets the header carry a grid the rows do not ([`HeaderOnly`](crate::Separators::HeaderOnly)).
     pub(super) fn template(
         &self,
         height: Length,
