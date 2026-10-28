@@ -13,6 +13,14 @@ Only compare runs from the same session: the same fixtures measured more than tw
 
 Two per-row walks are already gone: each name key is built once per listing rather than once per comparison (33c6b00), and the selection markers are collected once per frame rather than by walking every row's ancestor chain and subtree (c9d3142, which took the 1000-deep chain from 35 ms to 2.3 ms). What is left per row is its `Element` tree.
 
+Where those microseconds go, as far as the harness can tell:
+
+- Three columns cost about 5.6 µs per row, one column and two hidden about 3.8 µs. The difference is the visible columns' layout: the `container` per cell and the rule before it.
+- Building a hidden column's cell (its `Column::cell`, plus the text cut for its content) is only about 4 % of a row: not building it at all moved the two-hidden scenario 39.0 ms → 37.6 ms, and that is the whole saving.
+- Sorting by Size leaves about 103 rows per size value, so nearly every comparison falls through to the name tie-break; the sort and the row's own scaffolding (stack, background button, marker button, caret) carry the microseconds, not the cell text.
+
+The harness cannot settle a difference below a few percent. Within one binary, `fastest` of two runs agrees within 1 %, but semantically equal code rebuilt twice differed by up to 10 % in one scenario: the sorted-by-size run measured 47.9–48.0 ms before that cabinet change and 51.6–53.5 ms in three variants of it, with nothing in that path changed semantically. A change counts as real only when one binary repeats it and the affected scenario moves more than the untouched ones do — the hidden-cell change did not meet that bar and was left out.
+
 ## What iced 0.14 already does
 
 - Drawing off-screen rows is already skipped: `column::draw` keeps only children whose bounds intersect the viewport (`iced_widget-0.14.2/src/column.rs`: `.filter(|(_, layout)| layout.bounds().intersects(viewport))`). Building and laying out every row is what our measurement covers, so that filtering cannot help us.
