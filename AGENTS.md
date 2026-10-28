@@ -20,8 +20,9 @@ Item centres, measured from the pixels and hit 6 of 6 times in one try each (ope
 
 - Theme: opens at `(155, 73)`; Default light `(110, 100)`, Default dark `(110, 128)`, Syncative light `(110, 156)`, Syncative dark `(110, 184)`
 - Zebra: opens at `(115, 106)` in every theme; off `(115, 136)`, subtle `(115, 165)`, strong `(115, 193)` — Syncative items are 28 px tall, the Default themes' about 31 px
+- List checkboxes at `x = 49`, rows 37 px apart: header (selects all) `y = 219`, Dokumente `256`, Finanzen `293`, Projekte `330`, readme.md `367`; the topmost checkbox band in a column scan is the header's, not the first row's
 
-Click centres, not near an item's border: a point a few pixels inside the border selects the neighbouring entry, which reads as a shift of about 30 px. For a target that is not listed, take the shot with `GRID=50` and no steps, then measure the open menu's colour bands with `temp/pxscan.py` (a local helper, `temp/` is gitignored): `python3 temp/pxscan.py temp/subtle.png 300` prints each band's `y` range and RGB down column 300.
+For a target that is not listed, take the shot with `GRID=50` and no steps, then measure its colour bands with `SCAN=300` (or `agent-screenshot --scan temp/shot.png 300` on a shot taken without `GRID`): each band's `y` range and RGB down column 300, `SCAN=y=178` for a row.
 
 ## Verifying zebra stripes against the header
 
