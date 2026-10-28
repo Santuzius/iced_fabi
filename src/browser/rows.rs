@@ -152,7 +152,7 @@ impl Browser {
             .filter_map(|id| self.nodes.get(id))
             .map(|node| (node, name_key(&node.name)))
             .collect();
-        let column = &self.columns[self.sort_column.min(self.columns.len() - 1)];
+        let column = &self.columns[self.sort_column.min(self.columns.len() - 1)].column;
         let ascending = self.sort_ascending;
         let folders_first = self.folders_first;
         nodes.sort_by(|(a, name_a), (b, name_b)| {

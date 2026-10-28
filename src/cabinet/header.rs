@@ -40,7 +40,7 @@ where
             )
         } else {
             let mut headers: Vec<Element<'a, Message, Theme, Renderer>> =
-                (0..self.browser.columns().len())
+                (0..self.browser.column_count())
                     .map(|index| self.sort_button(index))
                     .collect();
             let mut name = headers.remove(0);
@@ -73,9 +73,16 @@ where
     /// One column's header: its title, plus the direction arrow when the list is sorted by it.
     fn sort_button(&self, index: usize) -> Element<'a, Message, Theme, Renderer> {
         let (sort_column, ascending) = self.browser.sort();
-        let mut title = row![self.label(self.browser.columns()[index].header())]
-            .spacing(4)
-            .align_y(Alignment::Center);
+        let mut title = row![
+            self.label(
+                self.browser
+                    .column(index)
+                    .expect("header index taken from column_count")
+                    .header()
+            )
+        ]
+        .spacing(4)
+        .align_y(Alignment::Center);
         if sort_column == index {
             let arrow = if ascending {
                 crate::icon::SORT_ASCENDING

@@ -192,6 +192,14 @@ where
             .into()
     }
 
+    /// The width the column at `index` claims. Every index reaching here comes from [`column_count`](crate::Browser::column_count) or from the cells a caller built over that range, so it is in range.
+    fn column_width(&self, index: usize) -> ColumnWidth {
+        self.browser
+            .column(index)
+            .expect("column index taken from column_count")
+            .width()
+    }
+
     /// The row template: selection box (when the boxes are shown), the Name cell and the other columns. The header and every row go through here, so their columns always share the same boundaries. `rules` draws the upright rules between the cells and frames the row with them at its very left and right, so the table's edge lines are solid from the header to the last row — on the [`FRAME`](super::paint::FRAME) strip itself, where the host's frame line sits, and as overlays: a fixed-width child at the end of a filling row misplaces itself in iced's flex, while a container aligned to the edge of a stack cannot. The caller passes the flag, which lets the header carry a grid the rows do not ([`HeaderOnly`](crate::Separators::HeaderOnly)). A column the browser hides is skipped whole, cell and neighbouring rule.
     pub(super) fn template(
         &self,
@@ -201,7 +209,6 @@ where
         name: Element<'a, Message, Theme, Renderer>,
         cells: Vec<Element<'a, Message, Theme, Renderer>>,
     ) -> Element<'a, Message, Theme, Renderer> {
-        let columns = self.browser.columns();
         let cell = |content: Element<'a, Message, Theme, Renderer>, width: ColumnWidth| {
             container(content)
                 .width(length(width))
@@ -217,7 +224,7 @@ where
         if self.boxes_shown() {
             row = row.push(container(marker).center_x(Length::Fixed(MARKER_CELL)));
         }
-        row = row.push(cell(name, columns[0].width()));
+        row = row.push(cell(name, self.column_width(0)));
         for (index, content) in cells.into_iter().enumerate() {
             // A hidden column is skipped whole: cell and the rule before it, so its neighbours meet with one rule between them and the width they get is what a hidden column never claimed.
             if self.browser.is_column_hidden(index + 1) {
@@ -226,7 +233,7 @@ where
             if rules {
                 row = row.push(self.vrule());
             }
-            row = row.push(cell(content, columns[index + 1].width()));
+            row = row.push(cell(content, self.column_width(index + 1)));
         }
         if !rules {
             return row.into();
@@ -250,7 +257,7 @@ where
 
     /// Blank cells, one per column after the Name column — for rows that carry no data (status lines, the selection-count header) yet must still draw the column rules.
     pub(super) fn empty_cells(&self) -> Vec<Element<'a, Message, Theme, Renderer>> {
-        (1..self.browser.columns().len())
+        (1..self.browser.column_count())
             .map(|_| iced_widget::Space::new().into())
             .collect()
     }

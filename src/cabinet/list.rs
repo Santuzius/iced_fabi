@@ -160,10 +160,15 @@ where
             icon::natural(kind_glyph, GLYPH)
         });
         name = name.push(self.cut(node.name.clone(), ColourField::Text));
-        // Every column after the built-in Name column renders its own cell.
-        let cells = self.browser.columns()[1..]
-            .iter()
-            .map(|col| self.cell_content(col.cell(self.browser, node)))
+        // Every column after the built-in Name column renders its own cell. A Range, not a filtered iterator: only an exact size hint lets `collect` allocate the Vec once instead of growing it per row.
+        let cells = (1..self.browser.column_count())
+            .map(|index| {
+                let column = self
+                    .browser
+                    .column(index)
+                    .expect("cell index taken from column_count");
+                self.cell_content(column.cell(self.browser, node))
+            })
             .collect();
         let content = self.template(
             Length::Fixed(ROW_HEIGHT),

@@ -95,7 +95,7 @@ impl NameColumn {
         Self { header: None }
     }
 
-    /// Replace the header label (the first column header in [`headers`](crate::Browser::columns) order).
+    /// Replace the header label (the first column header in [`column`](crate::Browser::column) order).
     pub fn with_header(mut self, header: impl Into<String>) -> Self {
         self.header = Some(header.into());
         self

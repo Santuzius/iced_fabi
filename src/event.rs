@@ -18,7 +18,7 @@ pub enum Event {
     HeaderMarkerPressed,
     /// A breadcrumb was pressed.
     CrumbPressed(NodeId),
-    /// A column header was pressed; the index is into [`columns`](crate::Browser::columns).
+    /// A column header was pressed; the index is into [`column_count`](crate::Browser::column_count).
     SortPressed(usize),
     /// The browse/tree switch was pressed.
     ModeSwitchPressed,

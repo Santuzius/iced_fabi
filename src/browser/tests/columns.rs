@@ -1,5 +1,6 @@
 //! Column configuration: the built-in enum, the visible list and hiding.
 
+use super::column;
 use crate::browser::Browser;
 use crate::{BuiltInColumn, Cell, Column, ModifiedColumn, Node, SizeColumn};
 
@@ -20,7 +21,7 @@ impl Column for TypeColumn {
 #[test]
 fn every_column_starts_visible() {
     let browser = Browser::new("My files");
-    assert!((0..browser.columns().len()).all(|index| !browser.is_column_hidden(index)));
+    assert!((0..browser.column_count()).all(|index| !browser.is_column_hidden(index)));
 }
 
 #[test]
@@ -91,7 +92,7 @@ fn built_ins_keep_their_ids_across_header_renames() {
         Box::new(ModifiedColumn::new().with_header("Geändert")) as Box<dyn Column>,
         Box::new(SizeColumn::new()),
     ]);
-    assert_eq!(browser.columns()[1].header(), "Geändert");
+    assert_eq!(column(&browser, 1).header(), "Geändert");
     browser.set_visible_columns([BuiltInColumn::Modified.into()]);
     assert!(!browser.is_column_hidden(1)); // named by id, not by the renamed header
     assert!(browser.is_column_hidden(2));
@@ -105,7 +106,7 @@ fn setting_and_adding_columns_resets_or_extends_visibility() {
         Box::new(BuiltInColumn::Modified) as Box<dyn Column>,
         Box::new(BuiltInColumn::Size),
     ]);
-    assert_eq!(browser.columns().len(), 3);
+    assert_eq!(browser.column_count(), 3);
     assert!(!browser.is_column_hidden(2)); // the new list starts fully visible
     browser.hide_column(2);
     browser.add_column(TypeColumn);

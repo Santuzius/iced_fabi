@@ -4,7 +4,7 @@ One crate, two halves: the state (`browser/`) and the widget (`cabinet/`), plus 
 
 - `src/lib.rs` — crate docs and the `pub use` list; the only place anything is re-exported.
 - `src/browser/` — the [`Browser`](crate::Browser) state. Every file adds its own `impl Browser` block, so the fields stay private to `browser` while each topic works on them directly:
-  - `mod.rs` — the struct, `new`/`open`, `update` (the whole event routing), and the settings that do not belong to one topic: columns (`add_column`, `set_columns`, `sort_by_column`) and their visibility (`hide_column`/`show_column`, `set_visible_columns`), the tool visibility ids and the clipboard flag behind the built-in Paste.
+  - `mod.rs` — the struct, `new`/`open`, `update` (the whole event routing), and the settings that do not belong to one topic: columns (`add_column`, `set_columns`, `sort_by_column`, read back through `column`/`column_count`) and their visibility (`hide_column`/`show_column`, `set_visible_columns`) — one `ColumnSlot` per column carries the column and its hidden flag together, so an index always means the same column —, the tool visibility ids and the clipboard flag behind the built-in Paste.
   - `node.rs` — the pure-data vocabulary: `NodeId` (derived ids), `Entry` (with `folder`/`file` builders), `Node` (carries its `id`), `EntryKind`, `Marker`, `Mode`, the selection enums, and the tree helpers `is_below` / `Node::id`.
   - `loading.rs` — the listing feed (`set_children`, `load_failed`, `request_load`) and removal (`remove`, `remove_selected`, `prune`).
   - `navigation.rs` — `activate`, `tap`, `goto`, `up`, mode, and the position queries (`current`, `path`, `node`, `name_chain`, `path_below_root`).

@@ -8,3 +8,10 @@ mod rows;
 mod selection;
 mod tools;
 mod update;
+
+/// The column at an index, for assertions: every test asks for an index it set up itself, so a missing one means a broken test, not a browser behaviour.
+pub(super) fn column(browser: &crate::Browser, index: usize) -> &dyn crate::Column {
+    browser
+        .column(index)
+        .expect("column index set up by the test itself")
+}

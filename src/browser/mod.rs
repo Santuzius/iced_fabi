@@ -70,13 +70,28 @@ pub struct Browser {
     /// When set, a file row appears only if its extension (after the last dot, case-insensitive) is in this list; folders are unaffected. `None` lists every file.
     pub(super) extensions: Option<Vec<String>>,
     pub(super) mode: Mode,
-    pub(super) columns: Vec<Box<dyn Column>>,
-    /// Parallel to [`columns`](Self::columns): a column whose flag is set is not drawn — header cell, body cells and its upright rule all stop; index 0 is never hidden.
-    pub(super) hidden: Vec<bool>,
+    /// The columns in display order, each with whether the cabinet draws it: index 0 is the built-in Name column and its `hidden` stays false. Hiding stops the header cell, the body cells and the upright rule; the column keeps its index, so sorting by it keeps working.
+    pub(super) columns: Vec<ColumnSlot>,
     /// Whether the app's clipboard holds something: only the app knows (the library carries no file data), and this flag is its answer, driving the built-in [`Paste`](crate::BuiltInTool::Paste).
     pub(super) has_clipboard: bool,
     /// Ids of tools taken out of the toolbar ([`hide_tool`](Self::hide_tool)); an empty tool id is never in here, so anonymous tools always draw.
     pub(super) hidden_tools: HashSet<String>,
+}
+
+/// One column of the listing and whether the cabinet draws it. The column and its visibility travel together so an index always means the same column; index 0 is the built-in Name column, whose `hidden` stays false.
+pub(super) struct ColumnSlot {
+    pub column: Box<dyn Column>,
+    pub hidden: bool,
+}
+
+impl ColumnSlot {
+    /// A listed column that is drawn.
+    fn shown(column: impl Column + 'static) -> Self {
+        Self {
+            column: Box::new(column),
+            hidden: false,
+        }
+    }
 }
 
 // Boxed columns are not Debug, so Browser cannot derive it.
@@ -98,8 +113,14 @@ impl std::fmt::Debug for Browser {
             .field("folders_only", &self.folders_only)
             .field("extensions", &self.extensions)
             .field("mode", &self.mode)
-            .field("columns", &self.columns.len())
-            .field("hidden", &self.hidden)
+            .field(
+                "columns",
+                &self
+                    .columns
+                    .iter()
+                    .map(|slot| (slot.column.header(), slot.hidden))
+                    .collect::<Vec<_>>(),
+            )
             .field("has_clipboard", &self.has_clipboard)
             .field("hidden_tools", &self.hidden_tools)
             .finish()
@@ -140,11 +161,10 @@ impl Browser {
             extensions: None,
             mode: Mode::Browse,
             columns: vec![
-                Box::new(NameColumn::new()),
-                Box::new(ModifiedColumn::new()),
-                Box::new(SizeColumn::new()),
+                ColumnSlot::shown(NameColumn::new()),
+                ColumnSlot::shown(ModifiedColumn::new()),
+                ColumnSlot::shown(SizeColumn::new()),
             ],
-            hidden: vec![false; 3],
             has_clipboard: false,
             hidden_tools: HashSet::new(),
         }
@@ -212,14 +232,18 @@ impl Browser {
 
     /// Append a custom column; returns its index (for [`sort_by_column`](Self::sort_by_column)). Added columns start visible.
     pub fn add_column(&mut self, column: impl Column + 'static) -> usize {
-        self.columns.push(Box::new(column));
-        self.hidden.push(false);
+        self.columns.push(ColumnSlot::shown(column));
         self.columns.len() - 1
     }
 
-    /// The columns in display order: index 0 is the built-in Name column, then the [set](Self::set_columns) / [added](Self::add_column) ones.
-    pub fn columns(&self) -> &[Box<dyn Column>] {
-        &self.columns
+    /// How many columns the listing has: index 0 is the built-in Name column, then the [set](Self::set_columns) / [added](Self::add_column) ones.
+    pub fn column_count(&self) -> usize {
+        self.columns.len()
+    }
+
+    /// The column at `index` in display order ([`column_count`](Self::column_count) counts them), or `None` past the end. Whether it is drawn is the separate question [`is_column_hidden`](Self::is_column_hidden) answers.
+    pub fn column(&self, index: usize) -> Option<&dyn Column> {
+        self.columns.get(index).map(|slot| slot.column.as_ref())
     }
 
     /// The column the rows are ordered by, and whether that order is ascending.
@@ -229,52 +253,60 @@ impl Browser {
 
     /// Click on a sort header: same column flips the direction, a new column starts ascending.
     pub fn sort_by_column(&mut self, column: usize) {
-        if column >= self.columns.len() {
+        let Some(slot) = self.columns.get(column) else {
             return;
-        }
+        };
         if self.sort_column == column {
             self.sort_ascending = !self.sort_ascending;
         } else {
             self.sort_column = column;
             self.sort_ascending = true;
         }
-        self.sort_id = self.columns[column].id();
+        self.sort_id = slot.column.id();
     }
 
     /// Replace every column but the built-in Name column at index 0 (which stays, so sorting, the breadcrumb and the rows keep their anchor); pass boxed [`BuiltInColumn`](crate::BuiltInColumn) variants for the defaults, boxed [`SizeColumn::new`] / [`ModifiedColumn::new`] instances to configure headers and renderers, or boxed custom [`Column`]s. The new list starts fully visible. Sorting follows the sorted column by its [`id`](Column::id): it keeps its direction at a new index, and a list without it sorts by Name, ascending.
     pub fn set_columns(&mut self, columns: impl IntoIterator<Item = Box<dyn Column>>) {
         self.columns.truncate(1);
-        self.columns.extend(columns);
-        self.hidden.truncate(1);
-        self.hidden.resize(self.columns.len(), false);
-        match self.columns.iter().position(|c| c.id() == self.sort_id) {
+        self.columns
+            .extend(columns.into_iter().map(|column| ColumnSlot {
+                column,
+                hidden: false,
+            }));
+        match self
+            .columns
+            .iter()
+            .position(|slot| slot.column.id() == self.sort_id)
+        {
             Some(index) => self.sort_column = index,
             None => {
                 self.sort_column = 0;
                 self.sort_ascending = true;
-                self.sort_id = self.columns[0].id();
+                self.sort_id = self.columns[0].column.id();
             }
         }
     }
 
-    /// Take a column out of the drawing: its header cell, every body cell and its upright rules stop being painted and the remaining columns claim its width. The column itself stays in [`columns`](Self::columns) — its index and sorting by it keep working — only the painting stops. Index 0 (the Name column) is always visible; an out-of-range index does nothing.
+    /// Take a column out of the drawing: its header cell, every body cell and its upright rules stop being painted and the remaining columns claim its width. The column itself stays listed — its index and sorting by it keep working — only the painting stops. Index 0 (the Name column) is always visible; an out-of-range index does nothing.
     pub fn hide_column(&mut self, column: usize) {
-        if column == 0 || column >= self.hidden.len() {
+        if column == 0 {
             return;
         }
-        self.hidden[column] = true;
+        if let Some(slot) = self.columns.get_mut(column) {
+            slot.hidden = true;
+        }
     }
 
     /// Put a [hidden](Self::hide_column) column back into the drawing.
     pub fn show_column(&mut self, column: usize) {
-        if column < self.hidden.len() {
-            self.hidden[column] = false;
+        if let Some(slot) = self.columns.get_mut(column) {
+            slot.hidden = false;
         }
     }
 
     /// Whether this column is hidden from the drawing (out of range: false).
     pub fn is_column_hidden(&self, column: usize) -> bool {
-        self.hidden.get(column).copied().unwrap_or(false)
+        self.columns.get(column).is_some_and(|slot| slot.hidden)
     }
 
     /// Show these columns and only these; every other one is hidden (the Name column at index 0 is never). The entries are [`ColumnKey`]s, and [`ColumnKey::from`] turns any [`Column`] value into one: built-ins as `ColumnKey::from(BuiltInColumn::Size)`, a custom column as `ColumnKey::from(TypeColumn)`, matched on the [`id`](Column::id) the columns report. An id that matches no column does nothing.
@@ -300,8 +332,8 @@ impl Browser {
     /// ```
     pub fn set_visible_columns(&mut self, visible: impl IntoIterator<Item = ColumnKey>) {
         let wanted: Vec<String> = visible.into_iter().map(|key| key.id().to_owned()).collect();
-        for (index, column) in self.columns.iter().enumerate().skip(1) {
-            self.hidden[index] = !wanted.contains(&column.id());
+        for slot in self.columns.iter_mut().skip(1) {
+            slot.hidden = !wanted.contains(&slot.column.id());
         }
     }
 

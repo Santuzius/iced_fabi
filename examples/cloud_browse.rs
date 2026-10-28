@@ -684,10 +684,14 @@ struct App {
 impl App {
     /// Rebuild the Columns dropdown's entries from the browser's columns (all but the always-on Name anchor).
     fn refresh_columns(&mut self) {
-        self.column_options = (1..self.browser.columns().len())
+        self.column_options = (1..self.browser.column_count())
             .map(|index| ColumnOption {
                 index,
-                label: self.browser.columns()[index].header(),
+                label: self
+                    .browser
+                    .column(index)
+                    .expect("index inside column_count")
+                    .header(),
                 visible: !self.browser.is_column_hidden(index),
             })
             .collect();
