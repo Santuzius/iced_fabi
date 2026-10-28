@@ -41,6 +41,7 @@ pub(super) enum ColourField {
     Muted,
     Accent,
     Folder,
+    SelectedFolder,
     Line,
 }
 
@@ -51,6 +52,7 @@ impl ColourField {
             ColourField::Muted => style.muted,
             ColourField::Accent => style.accent,
             ColourField::Folder => style.folder,
+            ColourField::SelectedFolder => style.selected_folder,
             ColourField::Line => style.line,
         }
     }

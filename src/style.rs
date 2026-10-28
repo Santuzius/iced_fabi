@@ -23,6 +23,8 @@ pub struct Style {
     pub on_danger: Color,
     /// Tint of the folder glyphs of tinted icon packs.
     pub folder: Color,
+    /// Tint of the folder glyphs of tinted icon packs on a selected row, where [`folder`](Self::folder) may sink into the [`selection`](Self::selection) band (iced's palettes derive both from the accent).
+    pub selected_folder: Color,
     /// Row background while selected. It gives way towards [`background`](Self::background) as far as the [`accent`](Self::accent) tick needs to keep a 3 : 1 contrast on it — the selection's counterpart of the header bounding the [`stripe`](Self::stripe).
     pub selection: Color,
     /// Row background under the pointer; keep it weaker than [`selection`](Self::selection).
@@ -83,6 +85,8 @@ impl Style {
             on_danger: on_colour(palette.danger),
             danger_hover: mix(palette.danger, palette.text, 0.12),
             folder: mix(palette.primary, palette.background, 0.3),
+            // The colour iced's palette pairs with this very background for content on it.
+            selected_folder: extended.primary.weak.text,
             selection,
             row_hover: Color {
                 a: 0.35,

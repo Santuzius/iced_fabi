@@ -150,7 +150,11 @@ where
         let (kind_glyph, field) = match node.kind {
             EntryKind::Folder => (
                 self.icons.folder(node, tree && row.expanded),
-                ColourField::Folder,
+                if row.marker == Marker::Selected {
+                    ColourField::SelectedFolder
+                } else {
+                    ColourField::Folder
+                },
             ),
             EntryKind::File => (self.icons.file(node), ColourField::Text),
         };

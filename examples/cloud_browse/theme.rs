@@ -120,6 +120,8 @@ pub(crate) fn syncative_style(theme: &Theme) -> iced_fabi::Style {
         on_danger: hex(0xffffff),
         selection: t.selection,
         folder: t.folder,
+        // Syncative keeps its folder blue on a selected row.
+        selected_folder: t.folder,
         row_hover: iced::Color {
             a: 0.5,
             ..t.selection
