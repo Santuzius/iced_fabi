@@ -20,6 +20,8 @@
 //!
 //! [`Cabinet`] is rebuilt on every draw from [`cabinet`] and carries the look of that one draw: the selection settings ([`crate::Selection`] and [`crate::Checkboxes`]) on the [`Browser`], the toolbar [`tool`](Cabinet::tool)s and the built-in [`BuiltInTool`] set ([`built_in_tools`](Cabinet::built_in_tools), [`Browser::hide_tool`] / [`Browser::show_tool`] switch named ones out and [`Browser::set_visible_tools`] sets the whole list at once), the [`action`](Cabinet::action) button ([`ActionButton`]), [`separators`](Cabinet::separators), [`style`](Cabinet::style), [`icons`](Cabinet::icons), [`text_size`](Cabinet::text_size), [`font`](Cabinet::font) and [`scrollbar`](Cabinet::scrollbar).
 //!
+//! As a picker: [`Browser::picker`] presets one of the [`Pick`] kinds, [`select_paths`](Browser::select_paths) ticks the app's saved paths before their folders are listed, the cabinet gets an [`ActionPlacement::Footer`] button, a [`cancel`](Cabinet::cancel) button and a fixed [`height`](Cabinet::height) for the modal card, and the confirm message reads [`picked`](Browser::picked). `examples/picker.rs` shows a folder, an exclusion and a `.nomedia` picker.
+//!
 //! The widget talks to the app in two directions only: it emits [`Event`]s — hand each one to [`Browser::update`] in your `update`, and the returned [`Outcome`] says what to do next (fetch, open, create, run a confirmed tool, or nothing) — and it receives listings via [`set_children`](Browser::set_children). Start-up: after configuring the browser, call [`open`](Browser::open) and act on its [`Outcome::NeedsLoad`] before the first draw.
 //!
 //! # The whole integration, three steps

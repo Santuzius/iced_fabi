@@ -44,11 +44,32 @@ iced_fabi::cabinet(&browser, MyMessage::Cabinet)
     .into() // or .build()
 ```
 
-Two examples:
+As a picker in a modal — "Browse…" instead of a typed path:
+
+```rust
+use iced_fabi::{ActionButton, ActionPlacement, Browser, Pick};
+
+// Opening: one folder (Pick::Folder), any folders (Pick::Folders) or any entries (Pick::Entries).
+let mut picker = Browser::picker("My drive", Pick::Folders);
+picker.select_paths(&saved_paths); // ticked before their folders are listed; parents show the dot
+let outcome = picker.open();       // NeedsLoad(ROOT), as always
+
+// View: a confirm / Cancel footer in the look of the cabinet's own dialogs, and a fixed height for the modal card.
+iced_fabi::cabinet(&picker, Message::Picker)
+    .action(ActionButton::new("Save", Message::Confirm).placement(ActionPlacement::Footer))
+    .cancel(Message::Cancel)
+    .height(440)
+
+// On Message::Confirm: `picker.picked()` is the selection as `/`-joined paths below the root —
+// a folder picker with nothing ticked hands over the folder it has open ("" is the root).
+```
+
+Three examples:
 
 ```sh
 cargo run --example minimal       # the whole API surface on ~100 lines, straight from std::fs
 cargo run --example cloud_browse  # a fake cloud drive answering one tick late
+cargo run --example picker        # a settings form filled through folder, exclusion and .nomedia pickers
 ```
 
 The cloud demo's bar switches every setting live: theme (including a reproduction of Syncative's palette and [`Style`]), icon pack, separator grid, zebra stripe, which entries are listed (all or folders only), selection (`multiple` / `single` / `none`), how the boxes appear (`shown` / `on long press` / `hidden`), where the action button sits (or that the cabinet gets none), and what happens to inapplicable toolbar tools (greyed or hidden).
