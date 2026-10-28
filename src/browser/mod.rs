@@ -22,7 +22,7 @@ use std::collections::{HashMap, HashSet};
 use crate::{
     column::{Column, ColumnKey, ModifiedColumn, NameColumn, SizeColumn},
     event::Event,
-    tool::ToolKey,
+    tool::{BuiltInTool, ToolKey},
 };
 
 /// The consequence of a [`Browser`] action, telling the application what it must do next.
@@ -74,7 +74,7 @@ pub struct Browser {
     pub(super) columns: Vec<ColumnSlot>,
     /// Whether the app's clipboard holds something: only the app knows (the library carries no file data), and this flag is its answer, driving the built-in [`Paste`](crate::BuiltInTool::Paste).
     pub(super) has_clipboard: bool,
-    /// Ids of tools taken out of the toolbar ([`hide_tool`](Self::hide_tool)); an empty tool id is never in here, so anonymous tools always draw.
+    /// Ids of tools taken out of the toolbar ([`hide_tool`](Self::hide_tool)); a tool without an [`id`](crate::Tool::id) can never match one of these, so it always draws.
     pub(super) hidden_tools: HashSet<String>,
 }
 
@@ -287,29 +287,40 @@ impl Browser {
         }
     }
 
-    /// Take a column out of the drawing: its header cell, every body cell and its upright rules stop being painted and the remaining columns claim its width. The column itself stays listed — its index and sorting by it keep working — only the painting stops. Index 0 (the Name column) is always visible; an out-of-range index does nothing.
-    pub fn hide_column(&mut self, column: usize) {
-        if column == 0 {
-            return;
-        }
-        if let Some(slot) = self.columns.get_mut(column) {
-            slot.hidden = true;
+    /// The display index of the column this id names ([`column`](Self::column) reports the ids back), or `None` when no column has it.
+    fn index_of(&self, id: &str) -> Option<usize> {
+        self.columns.iter().position(|slot| slot.column.id() == id)
+    }
+
+    /// Take a column out of the drawing: its header cell, every body cell and its upright rules stop being painted and the remaining columns claim its width. The column itself stays listed — its index and sorting by it keep working — only the painting stops. Columns are named, not counted: [`ColumnKey`] from a [`BuiltInColumn`](crate::BuiltInColumn) variant or from the [`id`](Column::id) a custom column reports. The Name column at index 0 is always visible; an id that matches no column does nothing.
+    pub fn hide_column(&mut self, column: impl Into<ColumnKey>) {
+        if let Some(index) = self.index_of(column.into().id()) {
+            // The Name column at index 0 is the anchor of rows, breadcrumb and sorting and stays visible.
+            if index > 0 {
+                self.columns[index].hidden = true;
+            }
         }
     }
 
     /// Put a [hidden](Self::hide_column) column back into the drawing.
-    pub fn show_column(&mut self, column: usize) {
-        if let Some(slot) = self.columns.get_mut(column) {
-            slot.hidden = false;
+    pub fn show_column(&mut self, column: impl Into<ColumnKey>) {
+        if let Some(index) = self.index_of(column.into().id()) {
+            self.columns[index].hidden = false;
         }
     }
 
-    /// Whether this column is hidden from the drawing (out of range: false).
-    pub fn is_column_hidden(&self, column: usize) -> bool {
-        self.columns.get(column).is_some_and(|slot| slot.hidden)
+    /// Whether this column is hidden from the drawing (an id no column has: false).
+    pub fn is_column_hidden(&self, column: impl Into<ColumnKey>) -> bool {
+        self.index_of(column.into().id())
+            .is_some_and(|index| self.columns[index].hidden)
     }
 
-    /// Show these columns and only these; every other one is hidden (the Name column at index 0 is never). The entries are [`ColumnKey`]s, and [`ColumnKey::from`] turns any [`Column`] value into one: built-ins as `ColumnKey::from(BuiltInColumn::Size)`, a custom column as `ColumnKey::from(TypeColumn)`, matched on the [`id`](Column::id) the columns report. An id that matches no column does nothing.
+    /// Whether the column at this display index is hidden — the cabinet's per-frame check; apps name columns by id through [`is_column_hidden`](Self::is_column_hidden).
+    pub(crate) fn is_column_hidden_at(&self, index: usize) -> bool {
+        self.columns.get(index).is_some_and(|slot| slot.hidden)
+    }
+
+    /// Show these columns and only these; every other one is hidden (the Name column at index 0 is never). The entries are [`ColumnKey`]s, matched on the [`id`](Column::id) the columns report: built-ins as `ColumnKey::built_in(BuiltInColumn::Size)`, a custom column as `ColumnKey::custom("Type")`. An id that matches no column does nothing.
     ///
     /// ```
     /// # use iced_fabi::{Browser, BuiltInColumn, Cell, Column, ColumnKey};
@@ -325,10 +336,10 @@ impl Browser {
     /// let mut browser = Browser::new("My files");
     /// browser.add_column(TypeColumn);
     /// // an app that offers only size and type:
-    /// browser.set_visible_columns([ColumnKey::from(BuiltInColumn::Size), ColumnKey::from(TypeColumn)]);
-    /// assert!(browser.is_column_hidden(1)); // Modified
-    /// assert!(!browser.is_column_hidden(2)); // Size
-    /// assert!(!browser.is_column_hidden(3)); // Type
+    /// browser.set_visible_columns([ColumnKey::built_in(BuiltInColumn::Size), ColumnKey::custom("Type")]);
+    /// assert!(browser.is_column_hidden(BuiltInColumn::Modified));
+    /// assert!(!browser.is_column_hidden(BuiltInColumn::Size));
+    /// assert!(!browser.is_column_hidden("Type"));
     /// ```
     pub fn set_visible_columns(&mut self, visible: impl IntoIterator<Item = ColumnKey>) {
         let wanted: Vec<String> = visible.into_iter().map(|key| key.id().to_owned()).collect();
@@ -349,10 +360,7 @@ impl Browser {
 
     /// Take a named tool out of the toolbar: it stops being drawn wherever the app adds it, and a group left without tools takes its divider with it. Tools are named, not counted: [`ToolKey`] from a [`BuiltInTool`](crate::BuiltInTool) variant or from the [`id`](crate::Tool::id) a custom tool returns. A tool without an id (the [`Tool`](crate::Tool) default) cannot be hidden.
     pub fn hide_tool(&mut self, tool: impl Into<ToolKey>) {
-        let key = tool.into();
-        if !key.id().is_empty() {
-            self.hidden_tools.insert(key.id().to_owned());
-        }
+        self.hidden_tools.insert(tool.into().id().to_owned());
     }
 
     /// Put a [hidden](Self::hide_tool) tool back into the toolbar.
@@ -360,8 +368,30 @@ impl Browser {
         self.hidden_tools.remove(tool.into().id());
     }
 
-    /// Whether the toolbar leaves this tool id out.
-    pub fn is_tool_hidden(&self, id: &str) -> bool {
-        self.hidden_tools.contains(id)
+    /// Whether the toolbar leaves this tool out.
+    pub fn is_tool_hidden(&self, tool: impl Into<ToolKey>) -> bool {
+        self.hidden_tools.contains(tool.into().id())
+    }
+
+    /// Show these tools and only these; every other one the browser can name is hidden. The entries are [`ToolKey`]s, matched on the [`id`](crate::Tool::id) tools report: listed ids turn visible, the unlisted [built-ins](BuiltInTool::ALL) hidden. A custom tool the browser was never told about keeps its current state — it can only be switched through [`hide_tool`](Self::hide_tool) and [`show_tool`](Self::show_tool) — and a tool without an id always draws.
+    ///
+    /// ```
+    /// # use iced_fabi::{Browser, BuiltInTool, ToolKey};
+    /// let mut browser = Browser::new("My files");
+    /// // an app whose toolbar offers copy and paste but no delete:
+    /// browser.set_visible_tools([ToolKey::from(BuiltInTool::Copy), ToolKey::from(BuiltInTool::Paste)]);
+    /// assert!(!browser.is_tool_hidden(BuiltInTool::Copy));
+    /// assert!(browser.is_tool_hidden(BuiltInTool::Delete));
+    /// ```
+    pub fn set_visible_tools(&mut self, visible: impl IntoIterator<Item = ToolKey>) {
+        let wanted: Vec<ToolKey> = visible.into_iter().collect();
+        for key in &wanted {
+            self.hidden_tools.remove(key.id());
+        }
+        for tool in BuiltInTool::ALL {
+            if !wanted.iter().any(|key| key.id() == tool.id()) {
+                self.hidden_tools.insert(tool.id().to_owned());
+            }
+        }
     }
 }

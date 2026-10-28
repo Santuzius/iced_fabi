@@ -9,9 +9,9 @@ pub trait Tool<Message> {
     /// The toolbar glyph.
     fn glyph(&self) -> icondata::Icon;
 
-    /// Stable identity for the tool visibility configuration ([`Browser::hide_tool`](Browser::hide_tool)), which names tools instead of counting positions. Default: the empty string, meaning the tool is always drawn and cannot be named there; the built-in tools and any tool the app wants switchable return a fixed id.
-    fn id(&self) -> String {
-        String::new()
+    /// Stable identity for the tool visibility configuration ([`Browser::hide_tool`](Browser::hide_tool)), which names tools instead of counting positions. Default: `None`, meaning the tool is always drawn and can never be matched by a hidden id; the built-in tools and any tool the app wants switchable return `Some` with a fixed id.
+    fn id(&self) -> Option<String> {
+        None
     }
 
     /// Whether the button is clickable (grey when not).
@@ -35,12 +35,15 @@ pub enum BuiltInTool {
 }
 
 impl BuiltInTool {
+    /// Every built-in tool, in the order [`Cabinet::built_in_tools`](crate::Cabinet::built_in_tools) adds them.
+    pub const ALL: [Self; 3] = [Self::Copy, Self::Paste, Self::Delete];
+
     /// The switch id of this tool: `copy`, `paste` or `delete`.
-    pub fn id(&self) -> String {
+    pub fn id(&self) -> &'static str {
         match self {
-            Self::Copy => "copy".into(),
-            Self::Paste => "paste".into(),
-            Self::Delete => "delete".into(),
+            Self::Copy => "copy",
+            Self::Paste => "paste",
+            Self::Delete => "delete",
         }
     }
 
@@ -67,8 +70,8 @@ impl<Message: From<BuiltInTool>> Tool<Message> for BuiltInTool {
         BuiltInTool::glyph(self)
     }
 
-    fn id(&self) -> String {
-        BuiltInTool::id(self)
+    fn id(&self) -> Option<String> {
+        Some(BuiltInTool::id(self).to_owned())
     }
 
     fn enabled(&self, browser: &Browser) -> bool {
@@ -90,7 +93,7 @@ pub struct ToolKey(String);
 impl ToolKey {
     /// The key of a built-in tool.
     pub fn built_in(tool: BuiltInTool) -> Self {
-        Self(tool.id())
+        Self(tool.id().to_owned())
     }
 
     /// The key of a custom tool: the [`id`](Tool::id) it returns.
@@ -122,9 +125,10 @@ impl From<String> for ToolKey {
     }
 }
 
-/// A [`Tool`] made from closures; see [`tool`].
+/// A [`Tool`] made from closures; see [`tool`]. Without an [`id`](SimpleTool::id) it is anonymous and always drawn.
 pub struct SimpleTool<Message> {
     glyph: icondata::Icon,
+    id: Option<String>,
     message: Box<dyn Fn(&Browser) -> Message>,
     enabled: Box<dyn Fn(&Browser) -> bool>,
 }
@@ -136,12 +140,19 @@ pub fn tool<Message>(
 ) -> SimpleTool<Message> {
     SimpleTool {
         glyph,
+        id: None,
         message: Box::new(message),
         enabled: Box::new(|_| true),
     }
 }
 
 impl<Message> SimpleTool<Message> {
+    /// Give the tool a fixed switch id so the visibility configuration can name it: `.id("duplicate")`. Without it [`Tool::id`] is `None` and the tool always draws.
+    pub fn id(mut self, id: impl Into<String>) -> Self {
+        self.id = Some(id.into());
+        self
+    }
+
     /// Restrict when the button is clickable: `.when(|browser| browser.has_selection())`. The closure sees the latest browser state on every frame, so it may also capture app state by value at view time.
     pub fn when(mut self, enabled: impl Fn(&Browser) -> bool + 'static) -> Self {
         self.enabled = Box::new(enabled);
@@ -152,6 +163,10 @@ impl<Message> SimpleTool<Message> {
 impl<Message> Tool<Message> for SimpleTool<Message> {
     fn glyph(&self) -> icondata::Icon {
         self.glyph
+    }
+
+    fn id(&self) -> Option<String> {
+        self.id.clone()
     }
 
     fn enabled(&self, browser: &Browser) -> bool {

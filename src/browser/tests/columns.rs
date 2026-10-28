@@ -2,7 +2,7 @@
 
 use super::column;
 use crate::browser::Browser;
-use crate::{BuiltInColumn, Cell, Column, ModifiedColumn, Node, SizeColumn};
+use crate::{BuiltInColumn, Cell, Column, ColumnKey, ModifiedColumn, Node, SizeColumn};
 
 /// A stand-in custom column, like the apps' own.
 #[derive(Clone, Copy)]
@@ -21,32 +21,34 @@ impl Column for TypeColumn {
 #[test]
 fn every_column_starts_visible() {
     let browser = Browser::new("My files");
-    assert!((0..browser.column_count()).all(|index| !browser.is_column_hidden(index)));
+    assert!(!browser.is_column_hidden(BuiltInColumn::Name));
+    assert!(!browser.is_column_hidden(BuiltInColumn::Modified));
+    assert!(!browser.is_column_hidden(BuiltInColumn::Size));
 }
 
 #[test]
-fn hiding_and_showing_a_column_by_index() {
+fn hiding_and_showing_a_column_by_key() {
     let mut browser = Browser::new("My files");
-    browser.hide_column(2);
-    assert!(browser.is_column_hidden(2));
-    browser.show_column(2);
-    assert!(!browser.is_column_hidden(2));
+    browser.hide_column(BuiltInColumn::Size);
+    assert!(browser.is_column_hidden(BuiltInColumn::Size));
+    browser.show_column(BuiltInColumn::Size);
+    assert!(!browser.is_column_hidden(BuiltInColumn::Size));
 }
 
 #[test]
-fn the_name_column_and_bad_indices_stay_put() {
+fn the_name_column_and_unknown_ids_stay_put() {
     let mut browser = Browser::new("My files");
-    browser.hide_column(0);
-    browser.hide_column(99);
-    assert!(!browser.is_column_hidden(0));
-    assert!(!browser.is_column_hidden(99));
-    assert!(!browser.is_column_hidden(2)); // hide_column(99) did not shift anything
+    browser.hide_column(BuiltInColumn::Name);
+    browser.hide_column("missing");
+    assert!(!browser.is_column_hidden(BuiltInColumn::Name));
+    assert!(!browser.is_column_hidden("missing"));
+    assert!(!browser.is_column_hidden(BuiltInColumn::Size)); // hide_column("missing") did not shift anything
 }
 
 #[test]
 fn a_hidden_column_still_sorts() {
     let mut browser = Browser::sample();
-    browser.hide_column(2); // Size
+    browser.hide_column(BuiltInColumn::Size);
     browser.sort_by_column(2);
     assert_eq!(browser.sort(), (2, true));
 }
@@ -55,11 +57,11 @@ fn a_hidden_column_still_sorts() {
 fn the_visible_list_names_columns_not_indices() {
     let mut browser = Browser::new("My files");
     browser.add_column(TypeColumn); // index 3
-    browser.set_visible_columns([BuiltInColumn::Size.into(), TypeColumn.into()]);
-    assert!(browser.is_column_hidden(1)); // Modified is off
-    assert!(!browser.is_column_hidden(2)); // Size stays
-    assert!(!browser.is_column_hidden(3)); // the custom column stays
-    assert!(!browser.is_column_hidden(0)); // the anchor stays
+    browser.set_visible_columns([BuiltInColumn::Size.into(), ColumnKey::custom("Type")]);
+    assert!(browser.is_column_hidden(BuiltInColumn::Modified));
+    assert!(!browser.is_column_hidden(BuiltInColumn::Size));
+    assert!(!browser.is_column_hidden("Type")); // the custom column stays
+    assert!(!browser.is_column_hidden(BuiltInColumn::Name)); // the anchor stays
 }
 
 #[test]
@@ -79,10 +81,10 @@ fn a_renamed_custom_header_still_matches_its_type() {
     }
 
     browser.add_column(LabelledColumn);
-    browser.set_visible_columns([BuiltInColumn::Size.into(), TypeColumn.into()]); // "Type" matches nothing
-    assert!(browser.is_column_hidden(3));
-    browser.set_visible_columns([BuiltInColumn::Size.into(), LabelledColumn.into()]);
-    assert!(!browser.is_column_hidden(3));
+    browser.set_visible_columns([BuiltInColumn::Size.into(), ColumnKey::custom("Type")]); // "Type" matches nothing
+    assert!(browser.is_column_hidden("Typ"));
+    browser.set_visible_columns([BuiltInColumn::Size.into(), ColumnKey::custom("Typ")]);
+    assert!(!browser.is_column_hidden("Typ"));
 }
 
 #[test]
@@ -94,24 +96,24 @@ fn built_ins_keep_their_ids_across_header_renames() {
     ]);
     assert_eq!(column(&browser, 1).header(), "Geändert");
     browser.set_visible_columns([BuiltInColumn::Modified.into()]);
-    assert!(!browser.is_column_hidden(1)); // named by id, not by the renamed header
-    assert!(browser.is_column_hidden(2));
+    assert!(!browser.is_column_hidden(BuiltInColumn::Modified)); // named by id, not by the renamed header
+    assert!(browser.is_column_hidden(BuiltInColumn::Size));
 }
 
 #[test]
 fn setting_and_adding_columns_resets_or_extends_visibility() {
     let mut browser = Browser::new("My files");
-    browser.hide_column(2);
+    browser.hide_column(BuiltInColumn::Size);
     browser.set_columns([
         Box::new(BuiltInColumn::Modified) as Box<dyn Column>,
         Box::new(BuiltInColumn::Size),
     ]);
     assert_eq!(browser.column_count(), 3);
-    assert!(!browser.is_column_hidden(2)); // the new list starts fully visible
-    browser.hide_column(2);
+    assert!(!browser.is_column_hidden(BuiltInColumn::Size)); // the new list starts fully visible
+    browser.hide_column(BuiltInColumn::Size);
     browser.add_column(TypeColumn);
-    assert!(browser.is_column_hidden(2)); // hiding survives an append…
-    assert!(!browser.is_column_hidden(3)); // …and the appended column starts visible
+    assert!(browser.is_column_hidden(BuiltInColumn::Size)); // hiding survives an append…
+    assert!(!browser.is_column_hidden("Type")); // …and the appended column starts visible
 }
 
 #[test]
@@ -147,4 +149,19 @@ fn the_built_in_enum_dispatches_like_the_structs() {
     );
     assert_eq!(BuiltInColumn::Modified.id(), ModifiedColumn::new().id());
     assert_eq!(BuiltInColumn::Size.width(), SizeColumn::new().width());
+}
+
+#[test]
+fn column_keys_from_either_side_are_equal() {
+    assert_eq!(
+        ColumnKey::from(BuiltInColumn::Size),
+        ColumnKey::built_in(BuiltInColumn::Size)
+    );
+    assert_eq!(ColumnKey::custom("Type"), ColumnKey::from("Type"));
+    assert_eq!(ColumnKey::built_in(BuiltInColumn::Name).id(), "name");
+    assert_eq!(
+        ColumnKey::built_in(BuiltInColumn::Modified).id(),
+        "modified"
+    );
+    assert_eq!(ColumnKey::built_in(BuiltInColumn::Size).id(), "size");
 }

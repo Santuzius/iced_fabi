@@ -74,10 +74,10 @@ where
             .tools
             .iter()
             .filter(|item| match **item {
-                ToolbarItem::Tool(ref tool) => {
-                    let id = tool.id();
-                    id.is_empty() || !self.browser.is_tool_hidden(&id)
-                }
+                ToolbarItem::Tool(ref tool) => match tool.id() {
+                    None => true,
+                    Some(id) => !self.browser.is_tool_hidden(id),
+                },
                 ToolbarItem::Separator => true,
             })
             .collect();

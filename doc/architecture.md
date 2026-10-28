@@ -4,7 +4,7 @@ One crate, two halves: the state (`browser/`) and the widget (`cabinet/`), plus 
 
 - `src/lib.rs` — crate docs and the `pub use` list; the only place anything is re-exported.
 - `src/browser/` — the [`Browser`](crate::Browser) state. Every file adds its own `impl Browser` block, so the fields stay private to `browser` while each topic works on them directly:
-  - `mod.rs` — the struct, `new`/`open`, `update` (the whole event routing), and the settings that do not belong to one topic: columns (`add_column`, `set_columns`, `sort_by_column`, read back through `column`/`column_count`) and their visibility (`hide_column`/`show_column`, `set_visible_columns`) — one `ColumnSlot` per column carries the column and its hidden flag together, so an index always means the same column —, the tool visibility ids and the clipboard flag behind the built-in Paste.
+  - `mod.rs` — the struct, `new`/`open`, `update` (the whole event routing), and the settings that do not belong to one topic: columns (`add_column`, `set_columns`, `sort_by_column`, read back through `column`/`column_count`) and their visibility, named by `ColumnKey` rather than counted (`hide_column`/`show_column`, `set_visible_columns`; `is_column_hidden_at` is the cabinet's index-based look) — one `ColumnSlot` per column carries the column and its hidden flag together, so an index always means the same column —, the tool visibility ids (`hide_tool`/`show_tool`, `set_visible_tools` over `BuiltInTool::ALL`) and the clipboard flag behind the built-in Paste.
   - `node.rs` — the pure-data vocabulary: `NodeId` (derived ids), `Entry` (with `folder`/`file` builders), `Node` (carries its `id`), `EntryKind`, `Marker`, `Mode`, the selection enums, and the tree helpers `is_below` / `Node::id`.
   - `loading.rs` — the listing feed (`set_children`, `load_failed`, `request_load`) and removal (`remove`, `remove_selected`, `prune`).
   - `navigation.rs` — `activate`, `tap`, `goto`, `up`, mode, and the position queries (`current`, `path`, `node`, `name_chain`, `path_below_root`).
@@ -21,10 +21,10 @@ One crate, two halves: the state (`browser/`) and the widget (`cabinet/`), plus 
   - `action.rs` — the `ActionButton` (placement, `when` rule) and its `ActionPlacement`.
   - `labels.rs` — the `Labels` (status lines, count line) and `Cabinet::labels`.
   - `cut.rs` — the ellipsis label (a plain iced `Widget`).
-- `src/column.rs` — the [`Column`](crate::Column) trait (header, `id`, width, cell, compare), the built-in Name/Modified/Size columns, the `BuiltInColumn` unit enum and the `ColumnKey` used by the visibility lists.
+- `src/column.rs` — the [`Column`](crate::Column) trait (header, `id`, width, cell, compare), the built-in Name/Modified/Size columns, the `BuiltInColumn` unit enum (fixed `id`s: `name`/`modified`/`size`) and the `ColumnKey` (`built_in`/`custom`) used by the visibility lists.
 - `src/natural.rs` — natural ("File 2" < "File 10") comparison keys.
 - `src/format.rs` — `format_bytes`, `format_epoch`.
-- `src/tool.rs` — the toolbar [`Tool`](crate::Tool) trait (glyph, `id`, enabled, message), the closure-built [`SimpleTool`](crate::SimpleTool), the `BuiltInTool` unit enum and the `ToolKey` used by the visibility configuration.
+- `src/tool.rs` — the toolbar [`Tool`](crate::Tool) trait (glyph, optional `id`, enabled, message), the closure-built [`SimpleTool`](crate::SimpleTool) (`.id(..)` gives it a switch id), the `BuiltInTool` unit enum (`ALL`, fixed `id`s) and the `ToolKey` used by the visibility configuration.
 - `src/icon.rs` — cached SVG handles, the glyph constants, and the [`RowIcons`](crate::RowIcons) hook with `TablerIcons`.
 - `src/event.rs` — the [`Event`](crate::Event) enum the widget emits.
 - `src/style.rs` — the [`Style`](crate::Style) palette hook (`Style::from_theme` is the default).

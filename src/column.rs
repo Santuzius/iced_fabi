@@ -242,7 +242,7 @@ impl Column for SizeColumn {
     }
 }
 
-/// The built-in columns as a unit enum that is itself a [`Column`]: one variant per column, dispatching to the [`NameColumn`], [`ModifiedColumn`] and [`SizeColumn`] defaults. Use it wherever a column needs naming without constructing a struct — [`Browser::set_columns`](Browser::set_columns) takes boxed variants of it, and [`ColumnKey::from`] turns a variant into a key for [`Browser::set_visible_columns`](Browser::set_visible_columns). For custom headers or renderers use the structs.
+/// The built-in columns as a unit enum that is itself a [`Column`]: one variant per column, dispatching to the [`NameColumn`], [`ModifiedColumn`] and [`SizeColumn`] defaults. Use it wherever a column needs naming without constructing a struct — [`Browser::set_columns`](Browser::set_columns) takes boxed variants of it, and [`ColumnKey::built_in`] turns a variant into a key for [`Browser::set_visible_columns`](Browser::set_visible_columns). For custom headers or renderers use the structs.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BuiltInColumn {
     /// The flexible, clickable name column.
@@ -259,7 +259,7 @@ impl Column for BuiltInColumn {
     }
 
     fn id(&self) -> String {
-        self.column().id()
+        BuiltInColumn::id(self).to_owned()
     }
 
     fn width(&self) -> ColumnWidth {
@@ -276,6 +276,15 @@ impl Column for BuiltInColumn {
 }
 
 impl BuiltInColumn {
+    /// The switch id of this column: `name`, `modified` or `size`. Renaming a header with `with_header` never changes it.
+    pub fn id(&self) -> &'static str {
+        match self {
+            Self::Name => "name",
+            Self::Modified => "modified",
+            Self::Size => "size",
+        }
+    }
+
     /// The struct behind this variant, with its default configuration.
     fn column(&self) -> Box<dyn Column> {
         match self {
@@ -286,19 +295,42 @@ impl BuiltInColumn {
     }
 }
 
-/// A column named in a configuration list: [`ColumnKey::from`] turns any [`Column`] value into one, and lists like [`Browser::set_visible_columns`](Browser::set_visible_columns) match it against the browser's columns by [`id`](Column::id) — `ColumnKey::from(BuiltInColumn::Size)` names a built-in, `ColumnKey::from(TypeColumn)` one of your own.
+/// A column named in a configuration list: [`ColumnKey::built_in`] names one of the built-in columns, [`ColumnKey::custom`] a custom column by the [`id`](Column::id) it returns. Lists like [`Browser::set_visible_columns`](Browser::set_visible_columns) match keys against the browser's columns by id.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ColumnKey(String);
 
-impl<C: Column> From<C> for ColumnKey {
-    fn from(column: C) -> Self {
-        Self(column.id())
+impl ColumnKey {
+    /// The key of a built-in column.
+    pub fn built_in(column: BuiltInColumn) -> Self {
+        Self(column.id().to_owned())
+    }
+
+    /// The key of a custom column: the [`id`](Column::id) it returns, usually its header.
+    pub fn custom(id: impl Into<String>) -> Self {
+        Self(id.into())
+    }
+
+    /// The column id this key names.
+    pub fn id(&self) -> &str {
+        &self.0
     }
 }
 
-impl ColumnKey {
-    pub(crate) fn id(&self) -> &str {
-        &self.0
+impl From<BuiltInColumn> for ColumnKey {
+    fn from(column: BuiltInColumn) -> Self {
+        Self::built_in(column)
+    }
+}
+
+impl From<&str> for ColumnKey {
+    fn from(id: &str) -> Self {
+        Self::custom(id)
+    }
+}
+
+impl From<String> for ColumnKey {
+    fn from(id: String) -> Self {
+        Self::custom(id)
     }
 }
 

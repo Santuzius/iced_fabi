@@ -227,7 +227,7 @@ where
         row = row.push(cell(name, self.column_width(0)));
         for (index, content) in cells.into_iter().enumerate() {
             // A hidden column is skipped whole: cell and the rule before it, so its neighbours meet with one rule between them and the width they get is what a hidden column never claimed.
-            if self.browser.is_column_hidden(index + 1) {
+            if self.browser.is_column_hidden_at(index + 1) {
                 continue;
             }
             if rules {

@@ -71,11 +71,45 @@ fn tools_hide_and_show_by_key() {
 }
 
 #[test]
-fn an_anonymous_tool_cannot_be_hidden() {
+fn an_anonymous_tool_has_no_id_to_hide() {
+    // The inherent builder method shadows the trait one, so the trait side is checked through UFCS.
+    let anonymous = crate::tool::tool(icondata::TbCopyOutline, |_| Msg);
+    assert_eq!(
+        <crate::tool::SimpleTool<Msg> as Tool<Msg>>::id(&anonymous),
+        None,
+        "no id, so no hidden id can ever match it"
+    );
+    let named = anonymous.id("duplicate");
+    assert_eq!(
+        <crate::tool::SimpleTool<Msg> as Tool<Msg>>::id(&named),
+        Some("duplicate".into())
+    );
     let mut browser = Browser::new("My files");
-    browser.hide_tool("");
-    browser.hide_tool(ToolKey::custom(String::new()));
-    assert!(!browser.is_tool_hidden(""));
+    browser.hide_tool("duplicate");
+    assert!(browser.is_tool_hidden(ToolKey::custom("duplicate")));
+}
+
+#[test]
+fn the_visible_tools_list_switches_the_built_ins() {
+    let mut browser = Browser::new("My files");
+    browser.set_visible_tools([
+        ToolKey::from(BuiltInTool::Copy),
+        ToolKey::custom("duplicate"),
+    ]);
+    assert!(!browser.is_tool_hidden(BuiltInTool::Copy));
+    assert!(browser.is_tool_hidden(BuiltInTool::Paste));
+    assert!(browser.is_tool_hidden(BuiltInTool::Delete));
+    // a custom tool the list names turns visible too, even though unknown ones cannot be enumerated
+    browser.hide_tool("duplicate");
+    browser.set_visible_tools([ToolKey::custom("duplicate")]);
+    assert!(!browser.is_tool_hidden("duplicate"));
+    assert!(browser.is_tool_hidden(BuiltInTool::Copy));
+}
+
+#[test]
+fn the_built_in_set_is_what_the_toolbar_adds() {
+    let ids: Vec<&str> = BuiltInTool::ALL.iter().map(BuiltInTool::id).collect();
+    assert_eq!(ids, ["copy", "paste", "delete"]);
 }
 
 #[test]

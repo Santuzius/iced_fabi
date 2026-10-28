@@ -41,7 +41,7 @@ enum Message {
     Entries(EntryChoice),
     Selection(SelectionChoice),
     Action(ActionChoice),
-    ColumnToggle(usize),
+    ColumnToggle(ColumnKey),
     ToolToggle(ToolKey),
     Duplicate,
     Tick,
@@ -685,33 +685,36 @@ impl App {
     /// Rebuild the Columns dropdown's entries from the browser's columns (all but the always-on Name anchor).
     fn refresh_columns(&mut self) {
         self.column_options = (1..self.browser.column_count())
-            .map(|index| ColumnOption {
-                index,
-                label: self
+            .map(|index| {
+                let column = self
                     .browser
                     .column(index)
-                    .expect("index inside column_count")
-                    .header(),
-                visible: !self.browser.is_column_hidden(index),
+                    .expect("index inside column_count");
+                let key = ColumnKey::custom(column.id());
+                let visible = !self.browser.is_column_hidden(key.clone());
+                ColumnOption {
+                    key,
+                    label: column.header(),
+                    visible,
+                }
             })
             .collect();
     }
 
     /// Rebuild the Tools dropdown's entries: the library's built-in set and the demo's own tool, checked against the browser's hidden ids.
     fn refresh_tools(&mut self) {
-        let mut options: Vec<ToolOption> =
-            [BuiltInTool::Copy, BuiltInTool::Paste, BuiltInTool::Delete]
-                .into_iter()
-                .map(|tool| ToolOption {
-                    key: ToolKey::from(tool),
-                    label: tool.label().to_string(),
-                    visible: !self.browser.is_tool_hidden(&tool.id()),
-                })
-                .collect();
+        let mut options: Vec<ToolOption> = BuiltInTool::ALL
+            .into_iter()
+            .map(|tool| ToolOption {
+                key: ToolKey::from(tool),
+                label: tool.label().to_string(),
+                visible: !self.browser.is_tool_hidden(tool),
+            })
+            .collect();
         options.push(ToolOption {
-            key: ToolKey::custom(DuplicateHere.id()),
+            key: ToolKey::custom(DuplicateHere::ID),
             label: "Duplicate".into(),
-            visible: !self.browser.is_tool_hidden(&DuplicateHere.id()),
+            visible: !self.browser.is_tool_hidden(DuplicateHere::ID),
         });
         self.tool_options = options;
     }
@@ -756,11 +759,11 @@ impl App {
         let mut browser = Browser::new("My files");
         browser.add_column(TypeColumn);
         // All four columns on. At init a whitelist in one call is enough instead: writing only
-        // `[ColumnKey::from(BuiltInColumn::Size), ColumnKey::from(TypeColumn)]` would start with Modified hidden.
+        // `[ColumnKey::built_in(BuiltInColumn::Size), ColumnKey::custom("Type")]` would start with Modified hidden.
         browser.set_visible_columns([
-            ColumnKey::from(BuiltInColumn::Modified),
-            ColumnKey::from(BuiltInColumn::Size),
-            ColumnKey::from(TypeColumn),
+            ColumnKey::built_in(BuiltInColumn::Modified),
+            ColumnKey::built_in(BuiltInColumn::Size),
+            ColumnKey::custom("Type"),
         ]);
         // The file kinds the cabinet may show — an app-side decision made here at init; to offer only PDFs, write ["pdf"].
         browser.set_file_extensions(["pdf", "docx", "md", "txt"]);
@@ -796,7 +799,7 @@ impl App {
                 Task::done(self.accept(outcome))
             }
             Message::ColumnToggle(column) => {
-                if self.browser.is_column_hidden(column) {
+                if self.browser.is_column_hidden(column.clone()) {
                     self.browser.show_column(column);
                 } else {
                     self.browser.hide_column(column);
@@ -993,7 +996,7 @@ impl App {
         }
         fn columns_list<'a>(options: &'a [ColumnOption], syncative: bool) -> Element<'a, Message> {
             let list = iced::widget::pick_list(options, None::<&ColumnOption>, |option| {
-                Message::ColumnToggle(option.index)
+                Message::ColumnToggle(option.key.clone())
             })
             .width(Length::Fixed(150.0))
             .placeholder("pick columns");
@@ -1182,7 +1185,7 @@ impl App {
 /// One entry of the Columns dropdown: which column it stands for, and how it reads there (a check mark for a drawn column, a cross for a hidden one).
 #[derive(Clone, PartialEq)]
 struct ColumnOption {
-    index: usize,
+    key: ColumnKey,
     label: String,
     visible: bool,
 }
@@ -1214,13 +1217,18 @@ impl fmt::Display for ToolOption {
 /// The demo's own toolbar tool — the bar-side counterpart of the custom column: the [`iced_fabi::Tool`] implementation supplies glyph, switch id, applicability and message; the id is what [`Browser::hide_tool`](iced_fabi::Browser::hide_tool) and the Tools dropdown match on. What the click does (copy and paste in one step) is entirely the demo's.
 struct DuplicateHere;
 
+impl DuplicateHere {
+    /// The switch id the Tools dropdown and [`Browser::hide_tool`](iced_fabi::Browser::hide_tool) name this tool by.
+    const ID: &'static str = "duplicate";
+}
+
 impl Tool<Message> for DuplicateHere {
     fn glyph(&self) -> icondata::Icon {
         icondata::TbCopyPlusOutline
     }
 
-    fn id(&self) -> String {
-        "duplicate".into()
+    fn id(&self) -> Option<String> {
+        Some(Self::ID.to_owned())
     }
 
     fn enabled(&self, browser: &Browser) -> bool {

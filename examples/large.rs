@@ -6,7 +6,7 @@
 
 use std::time::{Duration, Instant};
 
-use iced_fabi::{Browser, Entry, EntryKind, Mode, NodeId};
+use iced_fabi::{Browser, BuiltInColumn, Entry, EntryKind, Mode, NodeId};
 
 /// Files in the single big folder (browse mode).
 const FILES: usize = 10_000;
@@ -171,8 +171,8 @@ fn main() {
     });
 
     let mut hidden = big_folder();
-    hidden.hide_column(1);
-    hidden.hide_column(2);
+    hidden.hide_column(BuiltInColumn::Modified);
+    hidden.hide_column(BuiltInColumn::Size);
     measure(
         "build browse 10k, 2 hidden",
         listed_rows(&hidden),
