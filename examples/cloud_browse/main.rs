@@ -748,14 +748,18 @@ fn extension(name: &str) -> Option<&str> {
 }
 
 /// Recursively snapshot an entry with its subtree out of the fake cloud; a real backend would fetch these listings on demand instead.
+/// The fake cloud's key for the folder `name` inside the folder keyed `parent`: the same join the reads use (`path_below_root(..).join("/")`), so the root's empty parent key never becomes a leading slash.
+fn cloud_key(parent: &str, name: &str) -> String {
+    if parent.is_empty() {
+        name.to_string()
+    } else {
+        format!("{parent}/{name}")
+    }
+}
+
 fn snapshot(cloud: &HashMap<String, Vec<Entry>>, parent: &str, entry: &Entry) -> Copied {
     let children = if matches!(entry.kind, EntryKind::Folder) {
-        // Same join as the fake cloud's keys: the root's parent path is "", so no leading slash.
-        let path = if parent.is_empty() {
-            entry.name.clone()
-        } else {
-            format!("{parent}/{}", entry.name)
-        };
+        let path = cloud_key(parent, &entry.name);
         cloud
             .get(&path)
             .map(|listing| {
@@ -776,7 +780,7 @@ fn snapshot(cloud: &HashMap<String, Vec<Entry>>, parent: &str, entry: &Entry) ->
 
 /// Re-home a copied subtree in the fake cloud: the folder's listing at its new path, the children's at theirs, and so on down.
 fn write_copy(cloud: &mut HashMap<String, Vec<Entry>>, parent: &str, copied: &Copied) {
-    let path = format!("{parent}/{}", copied.entry.name);
+    let path = cloud_key(parent, &copied.entry.name);
     let listing = copied
         .children
         .iter()
@@ -936,4 +940,50 @@ fn fake_cloud() -> HashMap<String, Vec<Entry>> {
             ],
         ),
     ])
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The demo's own listing keys follow `path_below_root(..).join("/")`, so the root scope's key is `""`: a folder pasted into the root must get its subtree under `"name copy"`, without a leading slash — that is the key the browser later loads it under.
+    #[test]
+    fn a_folder_copied_into_the_root_keeps_its_subtree() {
+        let mut cloud = fake_cloud();
+        let root = cloud.get("").cloned().unwrap_or_default();
+        let source = root
+            .iter()
+            .find(|entry| entry.name == "Finanzen")
+            .cloned()
+            .expect("the fake cloud's root lists Finanzen");
+        let mut top = snapshot(&cloud, "", &source);
+        assert!(
+            !top.children.is_empty(),
+            "the snapshot itself carries the subtree"
+        );
+        // The rename and write exactly as `put_copies` does them when pasting into the root.
+        top.entry.name = unique_copy_name(&top.entry.name, &root);
+        write_copy(&mut cloud, "", &top);
+        let names = |key: &str| {
+            cloud.get(key).map(|listing| {
+                listing
+                    .iter()
+                    .map(|entry| entry.name.clone())
+                    .collect::<Vec<_>>()
+            })
+        };
+        assert_eq!(
+            names("Finanzen copy"),
+            names("Finanzen"),
+            "opening the copy lists what the source lists"
+        );
+        assert!(
+            names("Finanzen copy/Krypto").is_some_and(|listing| !listing.is_empty()),
+            "nested folders keep their listings one level below the copy"
+        );
+        assert!(
+            !cloud.keys().any(|key| key.starts_with('/')),
+            "the root's empty parent key must never become a leading slash"
+        );
+    }
 }
