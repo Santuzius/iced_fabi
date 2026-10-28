@@ -22,7 +22,7 @@ Item centres, measured from the pixels and hit 6 of 6 times in one try each (ope
 
 - Theme: opens at `(155, 73)`; Default light `(110, 100)`, Default dark `(110, 128)`, Syncative light `(110, 156)`, Syncative dark `(110, 184)`
 - Zebra: opens at `(115, 106)` in every theme; off `(115, 136)`, subtle `(115, 165)`, strong `(115, 193)` — Syncative items are 28 px tall, the Default themes' about 31 px
-- Toolbar icons at `y ≈ 174`: Create folder `1109`, Copy `1141`, Paste `1173`, Duplicate `1205`, Delete `1252`
+- Toolbar icons at `y ≈ 174`: the leftmost icon `44` toggles browse/tree mode (tree shows the root row `My files` with carets); on the right, Create folder `1109`, Copy `1141`, Paste `1173`, Duplicate `1205`, Delete `1252`
 - List checkboxes at `x = 49`, rows 37 px apart: header (selects all) `y = 215`, Dokumente `252`, Finanzen `289`, Projekte `326`, readme.md `363`; the topmost checkbox band in a column scan is the header's, not the first row's
 - Confirmation/new-folder modal card spans `x 500–799`; its accent confirm button is centred at `(750, 492)` for the four-line delete card (title, question, count, buttons) and one line-gap higher for three-line cards (scan the accent band down column `x = 750` to re-measure after any card change)
 
