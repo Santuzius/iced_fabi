@@ -1180,8 +1180,6 @@ impl App {
     }
 }
 
-/// A custom column: the file extension in capitals, folders as "Folder"; sorted by kind first, then extension.
-#[derive(Debug)]
 /// One entry of the Columns dropdown: which column it stands for, and how it reads there (a check mark for a drawn column, a cross for a hidden one).
 #[derive(Clone, PartialEq)]
 struct ColumnOption {
@@ -1197,6 +1195,8 @@ impl fmt::Display for ColumnOption {
     }
 }
 
+/// A custom column: the file extension in capitals, folders as "Folder"; sorted by kind first, then extension.
+#[derive(Debug)]
 struct TypeColumn;
 
 /// One entry of the Tools dropdown: which tool it stands for, and how it reads there (a check mark for a drawn tool, a cross for a hidden one).
