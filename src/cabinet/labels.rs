@@ -18,7 +18,7 @@ pub struct Labels<'a> {
     pub new_folder_question: String,
     /// The new folder dialog's confirm button. Default: `Create`.
     pub create: String,
-    /// The new folder dialog's dismiss button. Default: `Cancel`.
+    /// The dismiss button of the dialogs and of [`Cabinet::cancel`](crate::Cabinet::cancel). Default: `Cancel`.
     pub cancel: String,
     /// Title and confirm button of the tool confirmation modal for Delete. Default: `Delete`.
     pub delete: String,

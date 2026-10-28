@@ -21,6 +21,8 @@ pub enum ActionPlacement {
     Floating,
     /// As the last item of the toolbar, right of the tool groups.
     ToolbarEnd,
+    /// Below the row list at the right edge, beside the [`cancel`](crate::Cabinet::cancel) button, drawn like the confirm button of the cabinet's dialogs — the footer of a picker.
+    Footer,
 }
 
 /// Corner radius, in px, that renders as completely round corners. Both iced 0.14 renderers clamp every corner radius to half the shorter side of the box before drawing it (tiny-skia: `iced_tiny_skia::engine::Engine::draw_quad`, "Make sure the border radius is not larger than the bounds"; wgpu: `iced_wgpu`'s `shader/quad/solid.wgsl`), so one value larger than the tallest button the cabinet draws is enough — and it needs neither the button's height (which differs by [`ActionPlacement`]) nor the renderer's default text size, which a style closure never sees (only `(&Theme, Status)` arrives there).
@@ -38,7 +40,7 @@ pub struct ActionButton<'a, Message> {
 }
 
 impl<'a, Message: Clone> ActionButton<'a, Message> {
-    /// The button's label and the message a click sends. Default placement [`WideCenter`](ActionPlacement::WideCenter), enabled while the browser has a selection.
+    /// The button's label and the message a click sends. Default placement [`WideCenter`](ActionPlacement::WideCenter), enabled while the browser [has a pick](Browser::has_pick): something is selected, or a folder picker's open folder stands in for it.
     #[must_use]
     pub fn new(text: impl Into<String>, on_press: Message) -> Self {
         Self {
@@ -56,7 +58,7 @@ impl<'a, Message: Clone> ActionButton<'a, Message> {
         self
     }
 
-    /// Replace the enable rule (mirrors a tool's `when`); false renders it grey like an inactive tool. Default: while at least one entry is selected.
+    /// Replace the enable rule (mirrors a tool's `when`); false renders it grey like an inactive tool. Default: [`Browser::has_pick`]. A picker that preselects the app's saved state passes `.when(|_| true)`, since confirming an emptied selection is an answer too.
     #[must_use]
     pub fn when(mut self, f: impl Fn(&Browser) -> bool + 'a) -> Self {
         self.when = Some(Rc::new(f));
@@ -71,6 +73,50 @@ where
         + iced_widget::core::Renderer
         + 'a,
 {
+    /// Whether the action's enable rule lets it be clicked this frame.
+    pub(super) fn action_enabled(&self, action: &ActionButton<'a, Message>) -> bool {
+        match &action.when {
+            Some(f) => f(self.browser),
+            None => self.browser.has_pick(),
+        }
+    }
+
+    /// The bar below the row list, when one is needed: the [`WideCenter`](ActionPlacement::WideCenter) button full-width, or the [`Footer`](ActionPlacement::Footer) button at the right edge — each with the [`cancel`](Cabinet::cancel) button before it, which otherwise sits alone at the right edge.
+    pub(super) fn footer(&self) -> Option<Element<'a, Message, Theme, Renderer>> {
+        let cancel = self
+            .cancel
+            .as_ref()
+            .map(|press| self.cancel_button(press.clone()));
+        let placement = self.action.as_ref().map(|action| action.placement);
+        let bar: iced_widget::Row<'a, Message, Theme, Renderer> = match (&self.action, placement) {
+            (Some(action), Some(ActionPlacement::WideCenter)) => {
+                let wide = self.action_button_element(action, ActionPlacement::WideCenter);
+                iced_widget::Row::new().push(cancel).push(wide)
+            }
+            (Some(action), Some(ActionPlacement::Footer)) => {
+                let confirm = self.confirm_button(
+                    action.text.clone(),
+                    crate::ConfirmTone::Accent,
+                    self.action_enabled(action).then(|| action.on_press.clone()),
+                );
+                self.dialog_buttons_maybe(cancel, confirm)
+            }
+            _ => {
+                let cancel = cancel?;
+                iced_widget::row![iced_widget::Space::new().width(Length::Fill), cancel]
+            }
+        };
+        Some(
+            container(
+                bar.spacing(8.0)
+                    .align_y(iced_widget::core::Alignment::Center),
+            )
+            .width(Length::Fill)
+            .padding([8.0, super::paint::EDGE])
+            .into(),
+        )
+    }
+
     /// The action button as an element: an accent-filled pill with the [`on_accent`](crate::Style::on_accent) label and a same-colour 1-px border; hover swaps in [`accent_hover`](crate::Style::accent_hover), and pressed is the base again. The corners are completely round (the radius is clamped by the renderer to half the button's height). Without a selection it sits greyed like an inactive tool: the fill, label and border at 50 %, 45 % and 50 % alpha, and no click. `placement` sizes it: full-width and centred text under the list, content-sized and compact in the toolbar.
     pub(super) fn action_button_element(
         &self,
@@ -94,10 +140,7 @@ where
         if placement == ActionPlacement::WideCenter {
             btn = btn.width(Length::Fill);
         }
-        let enabled = match &action.when {
-            Some(f) => f(self.browser),
-            None => self.browser.has_selection(),
-        };
+        let enabled = self.action_enabled(action);
         if enabled {
             btn = btn.on_press(action.on_press.clone());
         }
@@ -147,5 +190,28 @@ mod tests {
             action.when.is_some(),
             "the enable rule survived the builder"
         );
+    }
+
+    /// The bar below the list exists exactly when something needs it: a button placed there, or a Cancel.
+    #[test]
+    fn the_footer_appears_for_its_placements_and_for_cancel() {
+        let browser = Browser::new("t");
+        let footer = |action: Option<ActionPlacement>, cancel: bool| {
+            let mut cabinet: Cabinet<'_, (), iced::Renderer> = crate::cabinet(&browser, |_| ());
+            if let Some(placement) = action {
+                cabinet = cabinet.action(ActionButton::new("Go", ()).placement(placement));
+            }
+            if cancel {
+                cabinet = cabinet.cancel(());
+            }
+            cabinet.footer().is_some()
+        };
+        assert!(!footer(None, false));
+        assert!(footer(None, true));
+        assert!(footer(Some(ActionPlacement::WideCenter), false));
+        assert!(footer(Some(ActionPlacement::Footer), false));
+        assert!(!footer(Some(ActionPlacement::Floating), false));
+        assert!(!footer(Some(ActionPlacement::ToolbarEnd), false));
+        assert!(footer(Some(ActionPlacement::ToolbarEnd), true));
     }
 }

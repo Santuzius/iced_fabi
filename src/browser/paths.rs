@@ -41,7 +41,7 @@ enum Walk {
 }
 
 impl Browser {
-    /// A browser set up for one of the [`Pick`] kinds; the settings it applies stay individually adjustable afterwards. Confirm with [`picked`](Self::picked).
+    /// A browser set up for one of the [`Pick`] kinds; the settings it applies stay individually adjustable afterwards. Confirm with [`picked`](Self::picked); a cabinet over it typically carries an [`ActionPlacement::Footer`](crate::ActionPlacement::Footer) action and a [`cancel`](crate::Cabinet::cancel) button.
     pub fn picker(root: impl Into<String>, pick: Pick) -> Self {
         let mut browser = Self::new(root);
         match pick {

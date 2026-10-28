@@ -47,7 +47,7 @@ where
                     self.confirm_button(
                         self.labels.create.clone(),
                         crate::ConfirmTone::Accent,
-                        confirm,
+                        Some(confirm),
                     ),
                 ))
                 .spacing(super::dialog::LINE_GAP),

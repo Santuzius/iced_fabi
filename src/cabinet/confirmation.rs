@@ -35,7 +35,7 @@ where
                     self.confirm_button(
                         confirmation.confirm.clone(),
                         confirmation.tone,
-                        confirm_press,
+                        Some(confirm_press),
                     ),
                 ))
                 .spacing(super::dialog::LINE_GAP),

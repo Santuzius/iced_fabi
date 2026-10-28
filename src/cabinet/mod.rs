@@ -91,6 +91,9 @@ pub struct Cabinet<'a, Message: Clone, Renderer> {
     pub(super) tools: Vec<ToolbarItem<'a, Message>>,
     pub(super) mode_toggle: bool,
     pub(super) action: Option<ActionButton<'a, Message>>,
+    pub(super) cancel: Option<Message>,
+    pub(super) width: Length,
+    pub(super) height: Length,
     pub(super) on_event: Rc<dyn Fn(crate::Event) -> Message + 'a>,
     pub(super) style: Rc<dyn Fn(&Theme) -> Style + 'a>,
     pub(super) icons: &'a dyn RowIcons,
@@ -116,6 +119,9 @@ where
         tools: Vec::new(),
         mode_toggle: true,
         action: None,
+        cancel: None,
+        width: Length::Fill,
+        height: Length::Fill,
         style: Rc::new(Style::from_theme),
         icons: &TablerIcons,
         separators: Separators::default(),
@@ -183,6 +189,24 @@ where
     /// The cabinet's one action button (download, share, delete, …), built with [`ActionButton`]; ignored without one.
     pub fn action(mut self, action: ActionButton<'a, Message>) -> Self {
         self.action = Some(action);
+        self
+    }
+
+    /// A Cancel button below the row list, sending `message` — the way out of a picker. It sits before an action button [under the list](ActionPlacement::WideCenter) or [in the footer](ActionPlacement::Footer), otherwise alone at the right edge; its label is [`Labels::cancel`]. Default: none.
+    pub fn cancel(mut self, message: Message) -> Self {
+        self.cancel = Some(message);
+        self
+    }
+
+    /// The cabinet's width. Default: [`Length::Fill`].
+    pub fn width(mut self, width: impl Into<Length>) -> Self {
+        self.width = width.into();
+        self
+    }
+
+    /// The cabinet's height; give it a fixed one inside a modal card, whose content would otherwise shrink the row list away. Default: [`Length::Fill`].
+    pub fn height(mut self, height: impl Into<Length>) -> Self {
+        self.height = height.into();
         self
     }
 
@@ -260,27 +284,21 @@ where
             self.hrule(),
             list
         ];
-        if let Some(action) = self
-            .action
-            .as_ref()
-            .filter(|a| a.placement == ActionPlacement::WideCenter)
-        {
-            body = body.push(
-                container(self.action_button_element(action, ActionPlacement::WideCenter))
-                    .width(Length::Fill)
-                    .padding([8.0, paint::EDGE]),
-            );
-        }
+        body = body.push(self.footer());
         let body: Element<'a, Message, Theme, Renderer> = body.into();
         // A modal covers the whole cabinet — toolbar included — while the browser holds one: the new folder dialog over its draft, the confirmation modal over a pending tool.
         let modal = match self.browser.new_folder_draft() {
             Some(draft) => Some(self.new_folder_dialog(draft)),
             None => self.pending_confirmation_dialog(),
         };
-        match modal {
+        let content: Element<'a, Message, Theme, Renderer> = match modal {
             Some(modal) => iced_widget::stack![body, modal].into(),
             None => body,
-        }
+        };
+        container(content)
+            .width(self.width)
+            .height(self.height)
+            .into()
     }
 }
 

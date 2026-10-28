@@ -51,12 +51,12 @@ where
             .into()
     }
 
-    /// The modal's action button, filled in the confirmation's [`ConfirmTone`]: accent by default, danger red for a destructive action, so the eye lands on it and a destructive one warns in its colour.
+    /// The modal's action button, filled in the confirmation's [`ConfirmTone`]: accent by default, danger red for a destructive action, so the eye lands on it and a destructive one warns in its colour. Without a `press` it is greyed and inert; the [`Footer`](crate::ActionPlacement::Footer) action button is this button too.
     pub(super) fn confirm_button(
         &self,
         label: String,
         tone: crate::ConfirmTone,
-        press: Message,
+        press: Option<Message>,
     ) -> Element<'a, Message, Theme, Renderer> {
         let confirm_style = Rc::clone(&self.style);
         button(self.strong(label))
@@ -79,18 +79,24 @@ where
                     button::Status::Hovered | button::Status::Pressed => hover,
                     _ => fill,
                 };
+                // Greyed like the action button while there is nothing to confirm.
+                let ghost = status == button::Status::Disabled;
+                let fade = |c: Color, a: f32| Color { a, ..c };
                 button::Style {
-                    background: Some(Background::Color(background)),
-                    text_color: on_fill,
+                    background: Some(Background::Color(fade(
+                        background,
+                        if ghost { 0.5 } else { 1.0 },
+                    ))),
+                    text_color: fade(on_fill, if ghost { 0.45 } else { 1.0 }),
                     border: border::rounded(appearance.radius),
                     ..button::Style::default()
                 }
             })
-            .on_press(press)
+            .on_press_maybe(press)
             .into()
     }
 
-    /// The modal's dismiss button, drawn from the shared [`cancel`](crate::Labels::cancel) label.
+    /// The dismiss button of the modals and of the cabinet's [`cancel`](Cabinet::cancel), drawn from the shared [`cancel`](crate::Labels::cancel) label.
     pub(super) fn cancel_button(&self, press: Message) -> Element<'a, Message, Theme, Renderer> {
         button(self.label(self.labels.cancel.clone()))
             .padding([BUTTON_V_PADDING, BUTTON_H_PADDING])
@@ -105,9 +111,20 @@ where
         cancel: Element<'a, Message, Theme, Renderer>,
         confirm: Element<'a, Message, Theme, Renderer>,
     ) -> iced_widget::Row<'a, Message, Theme, Renderer> {
-        row![Space::new().width(Length::Fill), cancel, confirm]
+        self.dialog_buttons_maybe(Some(cancel), confirm)
             .spacing(8.0)
             .align_y(Alignment::Center)
+    }
+
+    /// [`dialog_buttons`](Self::dialog_buttons) with the Cancel button optional, as the cabinet's footer needs it.
+    pub(super) fn dialog_buttons_maybe(
+        &self,
+        cancel: Option<Element<'a, Message, Theme, Renderer>>,
+        confirm: Element<'a, Message, Theme, Renderer>,
+    ) -> iced_widget::Row<'a, Message, Theme, Renderer> {
+        row![Space::new().width(Length::Fill)]
+            .push(cancel)
+            .push(confirm)
     }
 
     /// The backdrop over the finished body with the card on top. The scrim doubles as the cancel hit-area — a click on it sends `cancel` — and `opaque` keeps the cabinet below from reacting at all, so a tool press behind an open modal cannot fire. The scrim paints as a rounded rectangle in the cabinet's own corner radius ([`Style::radius`](crate::Style::radius)); an app that wraps the cabinet in a bordered card gives that card the same radius and no padding of its own, so the darkening follows the card's rounded corners while the click-to-dismiss hit-area stays the full rectangle.
