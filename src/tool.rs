@@ -23,9 +23,11 @@ pub trait Tool<Message> {
     fn message(&self, browser: &Browser) -> Message;
 }
 
-/// The built-in tools as a unit enum that is itself a [`Tool`]: one variant per tool, drawn with its glyph and enabled from browser state — Copy and Delete while something is selected, Paste while the browser carries a [clipboard](Browser::set_has_clipboard). Its click yields the variant itself, so the message type needs an `impl From<BuiltInTool>`; [`Cabinet::built_in_tools`](crate::Cabinet::built_in_tools) adds the whole set. For tools of your own, implement [`Tool`] (the demo's `DuplicateHere` shows how) or use [`tool`].
+/// The built-in tools as a unit enum that is itself a [`Tool`]: one variant per tool, drawn with its glyph and enabled from browser state — Create folder always, Copy and Delete while something is selected, Paste while the browser carries a [clipboard](Browser::set_has_clipboard). Its click yields the variant itself, so the message type needs an `impl From<BuiltInTool>`; [`Cabinet::built_in_tools`](crate::Cabinet::built_in_tools) adds the whole set. For tools of your own, implement [`Tool`] (the demo's `DuplicateHere` shows how) or use [`tool`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BuiltInTool {
+    /// Offer the app a new folder in the open folder.
+    CreateFolder,
     /// Copy the selection into the app's clipboard.
     Copy,
     /// Hand the clipboard to the app for pasting here.
@@ -36,11 +38,12 @@ pub enum BuiltInTool {
 
 impl BuiltInTool {
     /// Every built-in tool, in the order [`Cabinet::built_in_tools`](crate::Cabinet::built_in_tools) adds them.
-    pub const ALL: [Self; 3] = [Self::Copy, Self::Paste, Self::Delete];
+    pub const ALL: [Self; 4] = [Self::CreateFolder, Self::Copy, Self::Paste, Self::Delete];
 
-    /// The switch id of this tool: `copy`, `paste` or `delete`.
+    /// The switch id of this tool: `create-folder`, `copy`, `paste` or `delete`.
     pub fn id(&self) -> &'static str {
         match self {
+            Self::CreateFolder => "create-folder",
             Self::Copy => "copy",
             Self::Paste => "paste",
             Self::Delete => "delete",
@@ -50,6 +53,7 @@ impl BuiltInTool {
     /// The tool's name, for menus that list the tools.
     pub fn label(&self) -> &'static str {
         match self {
+            Self::CreateFolder => "Create folder",
             Self::Copy => "Copy",
             Self::Paste => "Paste",
             Self::Delete => "Delete",
@@ -58,6 +62,7 @@ impl BuiltInTool {
 
     fn glyph(&self) -> icondata::Icon {
         match self {
+            Self::CreateFolder => icondata::TbFolderPlusOutline,
             Self::Copy => icondata::TbCopyOutline,
             Self::Paste => icondata::TbClipboardFilled,
             Self::Delete => icondata::TbTrashOutline,
@@ -76,6 +81,7 @@ impl<Message: From<BuiltInTool>> Tool<Message> for BuiltInTool {
 
     fn enabled(&self, browser: &Browser) -> bool {
         match self {
+            Self::CreateFolder => true,
             Self::Copy | Self::Delete => browser.has_selection(),
             Self::Paste => browser.has_clipboard(),
         }

@@ -109,7 +109,7 @@ fn the_visible_tools_list_switches_the_built_ins() {
 #[test]
 fn the_built_in_set_is_what_the_toolbar_adds() {
     let ids: Vec<&str> = BuiltInTool::ALL.iter().map(BuiltInTool::id).collect();
-    assert_eq!(ids, ["copy", "paste", "delete"]);
+    assert_eq!(ids, ["create-folder", "copy", "paste", "delete"]);
 }
 
 #[test]

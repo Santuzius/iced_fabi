@@ -29,6 +29,7 @@ fn main() -> iced::Result {
 #[derive(Debug, Clone)]
 enum Message {
     Cabinet(Event),
+    CreateFolder,
     Copy,
     Paste,
     Delete,
@@ -51,6 +52,7 @@ impl From<BuiltInTool> for Message {
     /// The built-in toolbar buttons yield their variant; this maps them onto the demo's messages.
     fn from(tool: BuiltInTool) -> Self {
         match tool {
+            BuiltInTool::CreateFolder => Self::CreateFolder,
             BuiltInTool::Copy => Self::Copy,
             BuiltInTool::Paste => Self::Paste,
             BuiltInTool::Delete => Self::Delete,
@@ -276,6 +278,19 @@ impl App {
             }
             Message::Action(choice) => {
                 self.action = choice;
+                Task::none()
+            }
+            Message::CreateFolder => {
+                // The built-in Create folder tool: the new folder goes into the fake cloud under the open one; a real backend would get the create call instead.
+                let key = self
+                    .browser
+                    .path_below_root(self.browser.current())
+                    .join("/");
+                let mut listing = self.cloud.get(&key).cloned().unwrap_or_default();
+                let name = unique_folder_name(&listing);
+                listing.push(Entry::folder(name).modified(now_epoch()));
+                self.cloud.insert(key.clone(), listing.clone());
+                self.browser.set_children(self.browser.current(), listing);
                 Task::none()
             }
             Message::Copy => {
@@ -778,6 +793,26 @@ fn delete_paths(cloud: &mut HashMap<String, Vec<Entry>>, path: &str) {
 }
 
 /// `report.pdf` → `report copy.pdf`, `report copy.pdf` → `report copy 2.pdf`, …
+/// The name for a folder the Create folder tool adds: `New folder`, then `New folder 2`, … until it is free in `listing`.
+fn unique_folder_name(listing: &[Entry]) -> String {
+    let mut candidate = "New folder".to_string();
+    let mut counter = 2;
+    while listing.iter().any(|entry| entry.name == candidate) {
+        candidate = format!("New folder {counter}");
+        counter += 1;
+    }
+    candidate
+}
+
+/// Seconds since the Unix epoch, for the `modified` stamp of entries the app creates.
+fn now_epoch() -> i64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |since| {
+            i64::try_from(since.as_secs()).unwrap_or(i64::MAX)
+        })
+}
+
 fn unique_copy_name(name: &str, listing: &[Entry]) -> String {
     let (stem, extension) = match extension(name) {
         Some(extension) => (
