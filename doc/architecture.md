@@ -21,7 +21,7 @@ One crate, two halves: the state (`browser/`) and the widget (`cabinet/`), plus 
   - `header.rs` — the select-all box, sort buttons, selection count.
   - `list.rs` — browse/tree lists, one row, status lines, cells.
   - `action.rs` — the `ActionButton` (placement, `when` rule) and its `ActionPlacement`.
-  - `dialog.rs` — the shared shell of the centred modals: backdrop (click = cancel) over the whole cabinet, painted rounded in the cabinet's corner radius so it follows a surrounding card, and the bordered card with its accent confirm and flat Cancel buttons.
+  - `dialog.rs` — the shared shell of the centred modals: backdrop over the whole cabinet (click = cancel; black scrim, rounded in the cabinet's corner radius so it follows a surrounding card) and the bordered card with its accent confirm and flat Cancel buttons.
   - `new_folder.rs` — the new folder dialog: the shell filled with the drafted name's text field.
   - `confirmation.rs` — the tool confirmation modal: the shell filled with a `ToolConfirmation`'s title, question and action-named button; the pending tool is looked up among the frame's tools and re-asked, so the words track the live selection.
   - `labels.rs` — the `Labels` (status lines, count line, dialog words) and `Cabinet::labels`.

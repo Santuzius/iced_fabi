@@ -15,7 +15,7 @@ pub(super) const CARD_WIDTH: f32 = 300.0;
 /// Inner padding of the card and the gap between its lines.
 pub(super) const CARD_PADDING: f32 = 16.0;
 pub(super) const LINE_GAP: f32 = 12.0;
-/// Alpha of the text-coloured scrim the backdrop darkens the cabinet with.
+/// Alpha of the black scrim the backdrop darkens the cabinet with — black in every theme like Syncative's modal backdrop, so a dark theme darkens too instead of lightening.
 pub(super) const SCRIM: f32 = 0.45;
 // The card's buttons match the bar's in height.
 const BUTTON_V_PADDING: f32 = 6.0;
@@ -114,9 +114,8 @@ where
                             container::Style {
                                 background: Some(Background::Color(Color {
                                     a: SCRIM,
-                                    ..appearance.text
+                                    ..Color::BLACK
                                 })),
-                                text_color: Some(appearance.text),
                                 border: border::rounded(appearance.radius),
                                 ..container::Style::default()
                             }
