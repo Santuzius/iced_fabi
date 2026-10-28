@@ -187,11 +187,13 @@ impl App {
             let mut top = copied;
             top.entry.name = unique_copy_name(&top.entry.name, &listing);
             listing.push(top.entry.clone());
-            // The subtree is re-homed at the renamed top; opening the copy later refetches these listings normally.
+            // The subtree is re-homed at the renamed top; the queue below picks these listings up right away, like every folder's.
             write_copy(&mut self.cloud, &key, &top);
         }
         self.cloud.insert(key.clone(), listing.clone());
-        self.browser.set_children(self.browser.current(), listing);
+        let current = self.browser.current();
+        self.browser.set_children(current, listing.clone());
+        self.queue_folder_loads(current, &key, &listing);
     }
     fn boot() -> (Self, Task<Message>) {
         let mut browser = Browser::new("My files");
@@ -205,7 +207,7 @@ impl App {
         ]);
         // The file kinds the cabinet may show — an app-side decision made here at init; to offer only PDFs, write ["pdf"].
         browser.set_file_extensions(["pdf", "docx", "md", "txt"]);
-        // Ask for the root immediately; everything else loads on navigation.
+        // Ask for the root immediately: each listing that lands queues its folder children (queue_folder_loads), so a few ticks in the browser knows the whole tree and a delete counts full subtrees even under collapsed folders; listings a navigation needs are answered the same way.
         let outcome = browser.open();
         let mut app = App {
             browser,
@@ -351,7 +353,8 @@ impl App {
                 for item in ready {
                     // A listing that raced a refresh just no-ops: set_children does nothing for pruned nodes.
                     let listing = self.cloud.get(&item.path).cloned().unwrap_or_default();
-                    self.browser.set_children(item.node, listing);
+                    self.browser.set_children(item.node, listing.clone());
+                    self.queue_folder_loads(item.node, &item.path, &listing);
                 }
                 Task::none()
             }
@@ -390,6 +393,21 @@ impl App {
             },
         }
         Message::Tick
+    }
+
+    /// Ask for the listings of every folder in a just-installed listing as well, so the browser ends up knowing the whole tree: the delete confirmation then counts every descendant of a selection, also the ones under collapsed folders and in browse mode. Each queued load is no less delayed by the fake backend than one asked for by navigation, and one that raced a navigation just no-ops like any other.
+    fn queue_folder_loads(&mut self, parent: iced_fabi::NodeId, parent_path: &str, listing: &[Entry]) {
+        for entry in listing.iter().filter(|entry| entry.kind == EntryKind::Folder) {
+            self.pending.push(Pending {
+                node: iced_fabi::NodeId::derive(parent, EntryKind::Folder, &entry.name),
+                path: if parent_path.is_empty() {
+                    entry.name.clone()
+                } else {
+                    format!("{parent_path}/{}", entry.name)
+                },
+                ticks: 2,
+            });
+        }
     }
 
     /// Drop the selected entries from the fake cloud (with their subtrees) and from the browser; a real backend would get the delete call instead.
