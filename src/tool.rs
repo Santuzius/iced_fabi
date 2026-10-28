@@ -3,6 +3,16 @@
 use crate::browser::Browser;
 use crate::Labels;
 
+/// How the confirm button of a [`ToolConfirmation`] is coloured.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum ConfirmTone {
+    /// Filled with the palette's [`accent`](crate::Style::accent) — the ordinary choice.
+    #[default]
+    Accent,
+    /// Filled with the palette's [`danger`](crate::Style::danger): the button warns the way a destructive action does (the built-in Delete does this).
+    Danger,
+}
+
 /// The modal a tool asks for before its click does its work: drawn by the cabinet as a centred card — [`title`](Self::title), an optional [`body`](Self::body) paragraph, and a confirm button labelled [`confirm`](Self::confirm) next to the cabinet's own Cancel. See [`Tool::confirmation`].
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ToolConfirmation {
@@ -12,6 +22,8 @@ pub struct ToolConfirmation {
     pub body: Option<String>,
     /// The confirm button's label — name the action ("Delete"), not "OK", so the question is answerable at a glance.
     pub confirm: String,
+    /// Colour of that confirm button: [`Danger`](ConfirmTone::Danger) for a destructive action, [`Accent`](ConfirmTone::Accent) otherwise.
+    pub tone: ConfirmTone,
 }
 
 /// A toolbar button the programmer adds with [`tool`](crate::Cabinet::tool).
@@ -141,6 +153,7 @@ impl<Message: From<BuiltInTool>> Tool<Message> for BuiltInTool {
                     title: labels.delete.clone(),
                     body: Some(body),
                     confirm: labels.delete.clone(),
+                    tone: ConfirmTone::Danger,
                 })
             }
             Self::CreateFolder | Self::Copy | Self::Paste => None,
@@ -271,6 +284,11 @@ mod tests {
             .expect("Delete asks first");
         assert_eq!(asked.title, "Delete");
         assert_eq!(asked.confirm, "Delete");
+        assert_eq!(
+            asked.tone,
+            crate::ConfirmTone::Danger,
+            "the destructive confirm is drawn in the danger colour"
+        );
         assert_eq!(
             asked.body.as_deref(),
             Some("Are you sure you want to delete the selected entries?\n1 folder, 1 file"),

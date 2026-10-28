@@ -105,4 +105,4 @@ pub use event::Event;
 pub use format::{format_bytes, format_epoch};
 pub use icon::{RowIcons, TablerIcons};
 pub use style::Style;
-pub use tool::{BuiltInTool, SimpleTool, Tool, ToolConfirmation, ToolKey, tool};
+pub use tool::{BuiltInTool, ConfirmTone, SimpleTool, Tool, ToolConfirmation, ToolKey, tool};

@@ -15,6 +15,12 @@ pub struct Style {
     pub on_accent: Color,
     /// Hover variant of [`accent`](Self::accent) (the action button under the pointer).
     pub accent_hover: Color,
+    /// Fill of a destructive action's button — the confirm button of a [`ConfirmTone::Danger`](crate::ConfirmTone::Danger) confirmation.
+    pub danger: Color,
+    /// Hover variant of [`danger`](Self::danger).
+    pub danger_hover: Color,
+    /// Text on danger-filled surfaces.
+    pub on_danger: Color,
     /// Tint of the folder glyphs of tinted icon packs.
     pub folder: Color,
     /// Row background while selected.
@@ -47,6 +53,15 @@ pub(super) fn mix(a: Color, b: Color, t: f32) -> Color {
     }
 }
 
+/// The readable text colour on a surface filled with `fill`: white on a dark fill, black on a light one.
+pub(super) fn on_colour(fill: Color) -> Color {
+    if 0.299 * fill.r + 0.587 * fill.g + 0.114 * fill.b < 0.5 {
+        Color::WHITE
+    } else {
+        Color::BLACK
+    }
+}
+
 /// [`Style`] from the theme's palette.
 impl Style {
     /// Every field from the active iced theme's palette — the widget's default (what [`style`](crate::Cabinet::style) starts with).
@@ -62,16 +77,11 @@ impl Style {
                 ..palette.text
             },
             accent: palette.primary,
-            on_accent: if 0.299 * palette.primary.r
-                + 0.587 * palette.primary.g
-                + 0.114 * palette.primary.b
-                < 0.5
-            {
-                Color::WHITE
-            } else {
-                Color::BLACK
-            },
+            on_accent: on_colour(palette.primary),
             accent_hover: mix(palette.primary, palette.text, 0.12),
+            danger: palette.danger,
+            on_danger: on_colour(palette.danger),
+            danger_hover: mix(palette.danger, palette.text, 0.12),
             folder: mix(palette.primary, palette.background, 0.3),
             selection,
             row_hover: Color {

@@ -50,10 +50,11 @@ where
         .into()
     }
 
-    /// The modal's action button: accent-filled, so the eye lands on it.
+    /// The modal's action button, filled in the confirmation's [`ConfirmTone`]: accent by default, danger red for a destructive action, so the eye lands on it and a destructive one warns in its colour.
     pub(super) fn confirm_button(
         &self,
         label: String,
+        tone: crate::ConfirmTone,
         press: Message,
     ) -> Element<'a, Message, Theme, Renderer> {
         let confirm_style = Rc::clone(&self.style);
@@ -61,13 +62,21 @@ where
             .padding([BUTTON_V_PADDING, BUTTON_H_PADDING])
             .style(move |theme, status| {
                 let appearance = confirm_style(theme);
+                let (fill, hover, on_fill) = match tone {
+                    crate::ConfirmTone::Accent => {
+                        (appearance.accent, appearance.accent_hover, appearance.on_accent)
+                    }
+                    crate::ConfirmTone::Danger => {
+                        (appearance.danger, appearance.danger_hover, appearance.on_danger)
+                    }
+                };
                 let background = match status {
-                    button::Status::Hovered | button::Status::Pressed => appearance.accent_hover,
-                    _ => appearance.accent,
+                    button::Status::Hovered | button::Status::Pressed => hover,
+                    _ => fill,
                 };
                 button::Style {
                     background: Some(Background::Color(background)),
-                    text_color: appearance.on_accent,
+                    text_color: on_fill,
                     border: border::rounded(appearance.radius),
                     ..button::Style::default()
                 }

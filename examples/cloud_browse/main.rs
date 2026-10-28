@@ -741,6 +741,7 @@ impl Tool<Message> for DuplicateHere {
                 browser.selected().count()
             )),
             confirm: "Duplicate".into(),
+            tone: iced_fabi::ConfirmTone::Accent,
         })
     }
 }

@@ -27,6 +27,9 @@ struct Tones {
     success: iced::Color,
     warning: iced::Color,
     danger: iced::Color,
+    /// Syncative's `danger_fill`/`danger_fill_hover`: the fills of its destructive buttons (`theme::button_danger`), darker than the text `danger` in dark mode for contrast.
+    danger_fill: iced::Color,
+    danger_fill_hover: iced::Color,
     selection: iced::Color,
     /// Not in Syncative's `Tones`: the blue-grey of the folder glyphs in the cabinet.
     folder: iced::Color,
@@ -46,6 +49,8 @@ const SYNCATIVE_TONES_LIGHT: Tones = Tones {
     success: hex(0x2a8a4f),
     warning: hex(0xb7790f),
     danger: hex(0xc4372f),
+    danger_fill: hex(0xc4372f),
+    danger_fill_hover: hex(0xa92e27),
     selection: hex(0xdde7f4),
     folder: hex(0x5b7bb5),
 };
@@ -64,6 +69,8 @@ const SYNCATIVE_TONES_DARK: Tones = Tones {
     success: hex(0x4cbb73),
     warning: hex(0xe3a93a),
     danger: hex(0xe5584f),
+    danger_fill: hex(0xc0392f),
+    danger_fill_hover: hex(0xd24a40),
     selection: hex(0x2c3b4f),
     folder: hex(0x6a7db0),
 };
@@ -108,6 +115,9 @@ pub(crate) fn syncative_style(theme: &Theme) -> iced_fabi::Style {
         accent: t.accent,
         on_accent: t.on_accent,
         accent_hover: t.accent_hover,
+        danger: t.danger_fill,
+        danger_hover: t.danger_fill_hover,
+        on_danger: hex(0xffffff),
         selection: t.selection,
         folder: t.folder,
         row_hover: iced::Color {

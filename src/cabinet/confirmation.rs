@@ -33,7 +33,11 @@ where
                 .push(
                     self.dialog_buttons(
                         self.cancel_button(cancel.clone()),
-                        self.confirm_button(confirmation.confirm.clone(), confirm_press),
+                        self.confirm_button(
+                            confirmation.confirm.clone(),
+                            confirmation.tone,
+                            confirm_press,
+                        ),
                     ),
                 )
                 .spacing(super::dialog::LINE_GAP),

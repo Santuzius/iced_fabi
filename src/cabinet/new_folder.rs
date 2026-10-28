@@ -44,7 +44,11 @@ where
                 .push(
                     self.dialog_buttons(
                         self.cancel_button(cancel.clone()),
-                        self.confirm_button(self.labels.create.clone(), confirm),
+                        self.confirm_button(
+                            self.labels.create.clone(),
+                            crate::ConfirmTone::Accent,
+                            confirm,
+                        ),
                     ),
                 )
                 .spacing(super::dialog::LINE_GAP),
