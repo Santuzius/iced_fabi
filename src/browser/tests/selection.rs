@@ -218,11 +218,12 @@ fn single_selection_replaces_the_selection() {
         vec![NodeId::ROOT],
         "the header box ticks the scope itself as the one unit"
     );
-    // Tapping a box covered by that unit clears it — there is no dissolving in single mode.
+    // A single pick does not cover its content: tapping an entry inside picks that entry instead.
     browser.toggle(notes);
-    assert!(
-        !browser.has_selection(),
-        "the covered tap unticks the only unit"
+    assert_eq!(
+        browser.selected().collect::<Vec<_>>(),
+        vec![notes],
+        "the entry inside replaced the folder"
     );
     // Select-all under the mode selects the scope, never every child.
     browser.select_all();
@@ -368,4 +369,54 @@ fn unticking_inside_a_selected_folder_only_re_enters_listed_siblings() {
         vec![NodeId::derive(folder, EntryKind::Folder, "2025")],
         "the hidden beleg.pdf does not become a unit the list never showed"
     );
+}
+
+#[test]
+fn a_single_pick_does_not_tick_what_is_inside_it() {
+    let mut browser = Browser::sample();
+    browser.set_selection(crate::Selection::Single);
+    let folder = NodeId::derive(NodeId::ROOT, EntryKind::Folder, "Finanzen");
+    browser.set_children(folder, vec![Entry::file("beleg.pdf")]);
+    let child = NodeId::derive(folder, EntryKind::File, "beleg.pdf");
+    browser.toggle(folder);
+    assert_eq!(browser.marker(folder), Marker::Selected);
+    assert_eq!(
+        browser.marker(child),
+        Marker::Unselected,
+        "the folder is picked, not its content"
+    );
+    let _ = browser.activate(folder);
+    assert!(
+        browser
+            .browse_rows()
+            .iter()
+            .all(|row| row.marker == Marker::Unselected),
+        "inside the picked folder no row reads ticked"
+    );
+    assert_eq!(
+        browser.scope_marker(),
+        Marker::Selected,
+        "the header box is the open folder itself"
+    );
+    browser.set_mode(crate::Mode::Tree);
+    let markers: Vec<_> = browser
+        .tree_rows()
+        .iter()
+        .map(|row| (row.id, row.marker))
+        .collect();
+    assert!(markers.contains(&(folder, Marker::Selected)));
+    assert!(markers.contains(&(child, Marker::Unselected)));
+    assert!(
+        markers.contains(&(NodeId::ROOT, Marker::Partial)),
+        "the way to the pick keeps its dot"
+    );
+}
+
+#[test]
+fn a_single_pick_of_the_only_child_leaves_the_header_box_dotted() {
+    let mut browser = Browser::new("r");
+    browser.set_children(NodeId::ROOT, vec![Entry::folder("only")]);
+    browser.set_selection(crate::Selection::Single);
+    browser.toggle(NodeId::derive(NodeId::ROOT, EntryKind::Folder, "only"));
+    assert_eq!(browser.scope_marker(), Marker::Partial);
 }

@@ -89,8 +89,9 @@ impl Browser {
         };
         let partial = self.partial_marks();
         // One question for the whole listing: is the scope itself, or one of its ancestors, a selected unit? That covers every row here.
-        let covered =
-            self.selected.contains(&self.current) || self.selected_ancestor(self.current).is_some();
+        let covered = self.units_cover()
+            && (self.selected.contains(&self.current)
+                || self.selected_ancestor(self.current).is_some());
         self.sorted(&current.children)
             .into_iter()
             .filter(|id| self.is_listed(*id))
@@ -137,7 +138,7 @@ impl Browser {
         });
         // A file has no children; an unlisted folder shows no child rows until loaded, but keeps its caret (see `expandable`).
         if expanded {
-            let below = covered || self.selected.contains(&id);
+            let below = covered || (self.units_cover() && self.selected.contains(&id));
             for child in self.sorted(&node.children) {
                 self.tree_rows_at(child, depth + 1, below, partial, rows);
             }

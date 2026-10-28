@@ -159,7 +159,7 @@ pub enum Selection {
     /// As many units as the user likes, across levels.
     #[default]
     Multiple,
-    /// At most one entry: a new tick replaces whatever was selected.
+    /// At most one entry: a new tick replaces whatever was selected. A selected folder is the folder itself, not its content: the entries inside it stay unticked and can be picked instead.
     Single,
     /// No selection at all: a pure file view. The boxes never appear, ticking does nothing, and tapping a file reports [`Outcome::FileOpened`](crate::Outcome::FileOpened).
     None,
