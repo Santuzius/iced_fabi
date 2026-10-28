@@ -2,6 +2,8 @@
 
 Read [doc/README.md](doc/README.md) and the page matching the task before you start: conventions, architecture and research results are there. Keep what you learn about this project in `doc/`, not in an agent's memory.
 
+Commit every meaningful change as soon as it is done and the checks pass — one concern per commit, no stacking work into one big commit at the end.
+
 ## Writing in `doc/`
 
 One line per entry: what the part is for and what to look for in it, as in `doc/architecture.md`. Why a choice was made — an iced quirk it works around, a colour rule — belongs in the code's doc comments and the commit message.
