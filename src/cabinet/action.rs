@@ -71,7 +71,7 @@ where
         + iced_widget::core::Renderer
         + 'a,
 {
-    /// The action button as an element, styled like Syncative's `button_primary`: an accent-filled pill with the [`on_accent`](crate::Style::on_accent) label and a same-colour 1-px border; hover swaps in [`accent_hover`](crate::Style::accent_hover), and pressed is the base again. The corners are completely round (the radius is clamped by the renderer to half the button's height). Without a selection it sits greyed like an inactive tool: the fill, label and border at 50 %, 45 % and 50 % alpha, and no click. `placement` sizes it: full-width and centred text under the list, content-sized and compact in the toolbar.
+    /// The action button as an element: an accent-filled pill with the [`on_accent`](crate::Style::on_accent) label and a same-colour 1-px border; hover swaps in [`accent_hover`](crate::Style::accent_hover), and pressed is the base again. The corners are completely round (the radius is clamped by the renderer to half the button's height). Without a selection it sits greyed like an inactive tool: the fill, label and border at 50 %, 45 % and 50 % alpha, and no click. `placement` sizes it: full-width and centred text under the list, content-sized and compact in the toolbar.
     pub(super) fn action_button_element(
         &self,
         action: &ActionButton<'a, Message>,

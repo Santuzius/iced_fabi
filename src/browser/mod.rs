@@ -170,7 +170,7 @@ impl Browser {
         }
     }
 
-    /// Start the browser on its root: everything is configured, now ask for the root listing. On a fresh browser this always returns [`NeedsLoad`](Outcome::NeedsLoad)([`NodeId::ROOT`]) — act on it before the first draw, e.g. `Task::done` a fetch message in `main`. It is a plain `&mut self` method, so it fits both a configuration chain (`browser` built first, then `let outcome = browser.open();`) and re-opening an existing browser.
+    /// Start the browser on its root: everything is configured, now ask for the root listing. On a fresh browser this always returns [`NeedsLoad`](Outcome::NeedsLoad)([`NodeId::ROOT`]) — act on it before the first draw, e.g. `Task::done` a fetch message in `main`.
     pub fn open(&mut self) -> Outcome {
         self.request_load(NodeId::ROOT)
     }
@@ -292,7 +292,7 @@ impl Browser {
         self.columns.iter().position(|slot| slot.column.id() == id)
     }
 
-    /// Take a column out of the drawing: its header cell, every body cell and its upright rules stop being painted and the remaining columns claim its width. The column itself stays listed — its index and sorting by it keep working — only the painting stops. Columns are named, not counted: [`ColumnKey`] from a [`BuiltInColumn`](crate::BuiltInColumn) variant or from the [`id`](Column::id) a custom column reports. The Name column at index 0 is always visible; an id that matches no column does nothing.
+    /// Take a column out of the drawing: its header cell, every body cell and its upright rules stop being painted and the remaining columns claim its width. The column itself stays listed — its index and sorting by it keep working — only the painting stops. Columns are named, not counted: a [`ColumnKey`] from a [`BuiltInColumn`](crate::BuiltInColumn) variant or from the [`id`](Column::id) a custom column reports; the Name column at index 0 is always visible, and an id that matches no column does nothing.
     pub fn hide_column(&mut self, column: impl Into<ColumnKey>) {
         if let Some(index) = self.index_of(column.into().id()) {
             // The Name column at index 0 is the anchor of rows, breadcrumb and sorting and stays visible.

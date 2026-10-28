@@ -25,35 +25,55 @@
 //! # The whole integration, three steps
 //!
 //! ```no_run
+//! use iced::{Element, Task};
 //! use iced_fabi::{Browser, Entry, Event, NodeId, Outcome};
 //!
 //! #[derive(Clone)]
-//! enum Message { Cabinet(Event), Listed(Vec<Entry>), Open(NodeId) }
+//! enum Message {
+//!     Cabinet(Event),
+//!     /// A listing fetched for the node behind a [`NeedsLoad`](Outcome::NeedsLoad).
+//!     Listed(NodeId, Vec<Entry>),
+//! }
+//!
+//! struct App {
+//!     browser: Browser,
+//! }
 //!
 //! // 1. set-up: state, behaviour, then `open()` for the first listing request.
-//! let mut browser = Browser::new("My files");
-//! let first = browser.open();
-//!
-//! // 2. update: one call, and the Outcome says what the app must do.
-//! let message = Message::Cabinet(Event::RowPressed(iced_fabi::NodeId::ROOT));
-//! let update = |app: (&mut Browser, Vec<Message>), message: Message| -> Vec<Message> {
-//!     let (browser, mut out) = app;
-//!     match message {
-//!         Message::Cabinet(event) => match browser.update(event) {
-//!             Outcome::NeedsLoad(id) => out.push(Message::Listed(vec![])), // fetch via browser.path_below_root(id)
-//!             Outcome::FileOpened(id) => out.push(Message::Open(id)), // open it in a viewer, download, …
-//!             Outcome::None | Outcome::SelectionChanged => {}
-//!         },
-//!         Message::Listed(entries) => { let _ = entries; /* browser.set_children(id, entries) */ }
-//!         Message::Open(_) => {} // the app's own follow-up work
+//! impl App {
+//!     fn boot() -> (Self, Task<Message>) {
+//!         let mut browser = Browser::new("My files");
+//!         let task = match browser.open() {
+//!             // here the app would start its fetch and send the entries back as Message::Listed.
+//!             Outcome::NeedsLoad(id) => Task::done(Message::Listed(id, Vec::new())),
+//!             _ => Task::none(),
+//!         };
+//!         (App { browser }, task)
 //!     }
-//!     out.clone()
-//! };
-//! let _ = update((&mut browser, vec![]), message);
 //!
-//! // 3. view: one builder chain per frame; `.into()` is the Element.
-//! let _element: iced::Element<'_, Message> =
-//!     iced_fabi::cabinet::<Message, iced::Renderer>(&browser, Message::Cabinet).into();
+//!     // 2. update: one call, and the Outcome says what the app must do.
+//!     fn update(&mut self, message: Message) -> Task<Message> {
+//!         match message {
+//!             Message::Cabinet(event) => match self.browser.update(event) {
+//!                 Outcome::NeedsLoad(id) => Task::done(Message::Listed(id, Vec::new())), // fetch
+//!                 Outcome::FileOpened(_) | Outcome::SelectionChanged | Outcome::None => Task::none(),
+//!             },
+//!             Message::Listed(id, entries) => {
+//!                 self.browser.set_children(id, entries);
+//!                 Task::none()
+//!             }
+//!         }
+//!     }
+//!
+//!     // 3. view: one builder chain per frame; `.into()` is the Element.
+//!     fn view(&self) -> Element<'_, Message> {
+//!         iced_fabi::cabinet(&self.browser, Message::Cabinet).into()
+//!     }
+//! }
+//!
+//! fn main() -> iced::Result {
+//!     iced::application(App::boot, App::update, App::view).run()
+//! }
 //! ```
 //!
 //! A complete runnable app is [`examples/minimal.rs`](https://github.com/Santuzius/iced_fabi/blob/main/examples/minimal.rs) (local disk via `std::fs`); the full feature parade is `examples/cloud_browse.rs`.
