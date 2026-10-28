@@ -13,10 +13,10 @@ impl Browser {
     pub fn remove_selected(&mut self) {
         let selected: Vec<NodeId> = self.selected.iter().copied().collect();
         self.remove(&selected);
-        self.selected.clear();
+        self.clear_selection();
     }
 
-    /// Remove entries from the tree, the way a delete the app performed in the backend must show up: each entry is spliced out of its parent's listing and its whole subtree's state (nodes, expansion, selections) is pruned. Entries below another listed entry go with it. Refuses to delete the root scope.
+    /// Remove entries from the tree, the way a delete the app performed in the backend must show up: each entry is spliced out of its parent's listing and its whole subtree's state (nodes, expansion, selections, pending paths) is pruned. Entries below another listed entry go with it. Refuses to delete the root scope.
     pub fn remove(&mut self, ids: &[NodeId]) {
         if ids.contains(&NodeId::ROOT) {
             return;
@@ -32,6 +32,7 @@ impl Browser {
             .filter_map(|id| Some((self.nodes.get(&id)?.parent?, id)))
             .collect();
         for (parent, id) in victims {
+            self.drop_pending_below(id);
             if let Some(node) = self.nodes.get_mut(&parent) {
                 node.children.retain(|child| *child != id);
             }
@@ -87,6 +88,8 @@ impl Browser {
         for child in stale {
             self.prune(child);
         }
+        // A pending path may have become reachable through this listing.
+        self.settle_pending();
     }
 
     /// Report that the listing for `id` failed; the node stays a (still expandable) branch and a later [`activate`](Browser::activate) or the widget's retry note asks again.

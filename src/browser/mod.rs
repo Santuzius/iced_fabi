@@ -11,6 +11,7 @@ mod loading;
 mod long_press;
 mod navigation;
 mod new_folder;
+mod paths;
 pub(crate) mod rows;
 mod selection;
 #[cfg(test)]
@@ -18,6 +19,7 @@ mod tests;
 
 pub use long_press::LONG_PRESS;
 pub use node::{Checkboxes, Entry, EntryKind, Marker, Mode, Node, NodeId, Selection};
+pub use paths::Pick;
 
 use std::collections::{HashMap, HashSet};
 
@@ -94,6 +96,10 @@ pub struct Browser {
     pub(super) new_folder: Option<String>,
     /// The tool confirmation modal: `Some` while it is open, holding the confirmed tool's key ([`confirmation`](confirmation)).
     pub(super) pending_confirmation: Option<crate::ToolKey>,
+    /// Selected paths not listed yet, as names below the root ([`paths`](paths)); each turns into a [`selected`](Self::selected) node once the listing reaches it.
+    pub(super) pending: Vec<Vec<String>>,
+    /// Whether the open folder stands in for an empty selection ([`set_pick_open_folder`](Self::set_pick_open_folder)).
+    pub(super) pick_open_folder: bool,
 }
 
 /// One column of the listing and whether the cabinet draws it. The column and its visibility travel together so an index always means the same column; index 0 is the built-in Name column, whose `hidden` stays false.
@@ -143,6 +149,8 @@ impl std::fmt::Debug for Browser {
             .field("hidden_tools", &self.hidden_tools)
             .field("new_folder", &self.new_folder)
             .field("pending_confirmation", &self.pending_confirmation)
+            .field("pending", &self.pending)
+            .field("pick_open_folder", &self.pick_open_folder)
             .finish()
     }
 }
@@ -189,6 +197,8 @@ impl Browser {
             hidden_tools: HashSet::new(),
             new_folder: None,
             pending_confirmation: None,
+            pending: Vec::new(),
+            pick_open_folder: false,
         }
     }
 

@@ -29,7 +29,7 @@ where
         });
         let tree = self.browser.mode() == Mode::Tree;
         let content = if self.browser.has_selection() {
-            let count = self.browser.selected().count();
+            let count = self.browser.selection_count();
             // The count row keeps the full template (marker cell, Name column, rules) so the grid does not fall apart while something is selected.
             self.template(
                 Length::Fixed(ROW_HEIGHT),

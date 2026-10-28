@@ -84,13 +84,18 @@ impl Browser {
     pub fn set_selection(&mut self, selection: Selection) {
         self.selection = selection;
         match selection {
-            Selection::None => self.selected.clear(),
+            Selection::None => self.clear_selection(),
             Selection::Single => {
-                // Keep at most one unit: the most recently selected one, the rest go.
+                // Keep at most one unit: the most recently selected listed one, else the last pending path; the rest go.
                 let last = self.selected.last();
-                self.selected.clear();
-                if let Some(id) = last {
-                    self.selected.insert(id);
+                let last_pending = self.pending.pop();
+                self.clear_selection();
+                match (last, last_pending) {
+                    (Some(id), _) => {
+                        self.selected.insert(id);
+                    }
+                    (None, Some(path)) => self.pending.push(path),
+                    (None, None) => {}
                 }
             }
             Selection::Multiple => {}
@@ -121,14 +126,15 @@ impl Browser {
         self.selected.iter().copied()
     }
 
-    /// Whether anything at all is selected.
+    /// Whether anything at all is selected, [pending paths](Self::select_path) included.
     pub fn has_selection(&self) -> bool {
-        !self.selected.is_empty()
+        !self.selected.is_empty() || !self.pending.is_empty()
     }
 
-    /// Untick everything (e.g. from the app's cancel button).
+    /// Untick everything, [pending paths](Self::select_path) included (e.g. from the app's cancel button).
     pub fn clear_selection(&mut self) {
         self.selected.clear();
+        self.pending.clear();
     }
 
     /// The marker of the header's select-all box: ticked when the scope, one of its ancestors, or every one of its children is selected, a dot when something below the scope is.
@@ -162,7 +168,7 @@ impl Browser {
         let scope = self.scope();
         if self.selection == Selection::Single {
             let on = self.selected.contains(&scope) || self.selected_ancestor(scope).is_some();
-            self.selected.clear();
+            self.clear_selection();
             if !on {
                 self.selected.insert(scope);
             }
@@ -184,6 +190,7 @@ impl Browser {
             for id in inside {
                 self.selected.remove(&id);
             }
+            self.drop_pending_below(scope);
         }
     }
 
@@ -194,7 +201,7 @@ impl Browser {
             return;
         }
         if self.selection == Selection::Single {
-            self.selected.clear();
+            self.clear_selection();
             self.selected.insert(scope);
             return;
         }
@@ -211,6 +218,8 @@ impl Browser {
             .filter(|id| self.is_listed(*id))
             .collect();
         self.selected.extend(children);
+        // Pending paths that run through a child just selected are covered by it now.
+        self.settle_pending();
     }
 
     /// The marker this node shows: a tick when it is selected, explicitly or covered by a selected ancestor, a dot when something below it is selected, otherwise an empty box. A covered node therefore looks selected, mirroring what [`toggle`](Self::toggle) does when one of its boxes is tapped.
@@ -243,6 +252,7 @@ impl Browser {
     /// Every node with a selected node somewhere below it: the parents of the selected entries, collected once for a row list. Walking up stops at a node already in the set, so a shared chain is visited once; without this set, each row would walk its own whole loaded subtree.
     pub(super) fn partial_marks(&self) -> HashSet<NodeId> {
         let mut partial = HashSet::new();
+        self.pending_marks(&mut partial);
         for id in self.selected.iter() {
             let mut parent = self.nodes.get(id).and_then(|node| node.parent);
             while let Some(here) = parent {
@@ -255,14 +265,23 @@ impl Browser {
         partial
     }
 
-    /// Whether anything at or below `id` (only loaded parts can be known) is explicitly selected.
+    /// Whether anything below `id` is explicitly selected: a listed node, or a pending path running through it.
     fn has_selected_below(&self, id: NodeId) -> bool {
+        self.has_listed_selection_below(id) || {
+            let mut marks = HashSet::new();
+            self.pending_marks(&mut marks);
+            marks.contains(&id)
+        }
+    }
+
+    /// Whether a listed node below `id` (only loaded parts can be known) is explicitly selected.
+    fn has_listed_selection_below(&self, id: NodeId) -> bool {
         let Some(node) = self.nodes.get(&id) else {
             return false;
         };
         node.children
             .iter()
-            .any(|child| self.selected.contains(child) || self.has_selected_below(*child))
+            .any(|child| self.selected.contains(child) || self.has_listed_selection_below(*child))
     }
 
     /// Toggle the unit selection of a node. With [`Selection::None`](Selection::None) this does nothing.
@@ -274,7 +293,7 @@ impl Browser {
         }
         if self.selection == Selection::Single {
             let on = self.selected.contains(&id) || self.selected_ancestor(id).is_some();
-            self.selected.clear();
+            self.clear_selection();
             if !on {
                 self.selected.insert(id);
             }
@@ -288,16 +307,7 @@ impl Browser {
             self.uncheck_below(ancestor, id);
             return;
         }
-        self.selected.insert(id);
-        let clear: Vec<NodeId> = self
-            .selected
-            .iter()
-            .copied()
-            .filter(|other| *other != id && super::node::is_below(self, *other, id))
-            .collect();
-        for other in clear {
-            self.selected.remove(&other);
-        }
+        self.select_unit(id);
     }
 
     /// Unticks one covered entry while the rest of the selected `ancestor`'s subtree stays selected: the unit is dissolved along the chain from the ancestor down to `id`, re-entering every listed child (hidden ones, e.g. files under [`set_folders_only`](Self::set_folders_only), are dropped) as an explicit unit except the one the chain leads through. That loses nothing: `id` shows on screen, so every folder on the chain is expanded and listed, and the re-entered siblings cover their unloaded subtrees themselves. The chain's folders end up Partial, `id` itself Unselected.

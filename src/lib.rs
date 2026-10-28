@@ -94,7 +94,7 @@ mod style;
 mod tool;
 
 pub use browser::{
-    Browser, Checkboxes, Entry, EntryKind, LONG_PRESS, Marker, Mode, Node, NodeId, Outcome,
+    Browser, Checkboxes, Entry, EntryKind, LONG_PRESS, Marker, Mode, Node, NodeId, Outcome, Pick,
     Selection,
 };
 pub use cabinet::{ActionButton, ActionPlacement, Cabinet, Labels, Separators, cabinet};
