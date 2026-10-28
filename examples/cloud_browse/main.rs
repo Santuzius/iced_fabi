@@ -1,6 +1,6 @@
 //! A cloud directory browser without the cloud: the listings come from a fake backend that answers every request one tick late, so the `activate → NeedsLoad → set_children` round-trip and its loading states behave like a real network drive.
 //!
-//! The bar above the cabinet demos the configuration hooks with dropdowns: the [`iced::Theme`] (including a reproduction of Syncative's palette and [`iced_fabi::Style`]), the file/folder [`iced_fabi::RowIcons`] (Tabler, or the vendored multicolour Material Icon Theme), the [`iced_fabi::Separators`] grid, the zebra stripe behind every second row, which entries are listed (all or folders only — file kinds are filtered code-side at init), how many entries the selection holds (many, one, or none), how the boxes appear (always, on long press, or hidden), and where the selection's action button sits (under the list, floating, or last in the toolbar); also what happens to toolbar tools that are not currently applicable (greyed out, or hidden outright). The toolbar itself shows the [`iced_fabi::Tool`] API: the built-in [`iced_fabi::BuiltInTool`] set (create folder, copy, paste) arrives with one `built_in_tools` call, the custom [`DuplicateHere`] is the demo's own `Tool` carrying a selection's subtree and sits among the custom tools, and the destructive delete joins last behind a [`iced_fabi::Cabinet::tool_separator`]; a `Tools` dropdown switches any of them off ([`Browser::hide_tool`](iced_fabi::Browser::hide_tool)); selecting is done purely through the checkboxes. The column list gets one custom [`TypeColumn`], and a `Columns` dropdown switches which of the columns are drawn ([`Browser::hide_column`] / [`Browser::show_column`]; [`Browser::set_visible_columns`] is the same in one call at init).
+//! The bar above the cabinet demos the configuration hooks with dropdowns: the [`iced::Theme`] (including a reproduction of Syncative's palette and [`iced_fabi::Style`]), the file/folder [`iced_fabi::RowIcons`] (Tabler, or the vendored multicolour Material Icon Theme), the [`iced_fabi::Separators`] grid, the zebra stripe behind every second row, which entries are listed (all or folders only — file kinds are filtered code-side at init), how many entries the selection holds (many, one, or none), how the boxes appear (always, on long press, or hidden), and where the selection's action button sits (under the list, floating, or last in the toolbar), whether the browse/tree mode switch button is drawn at all ([`Cabinet::show_mode_toggle`](iced_fabi::Cabinet::show_mode_toggle), off by the bar's *Mode switch* dropdown); also what happens to toolbar tools that are not currently applicable (greyed out, or hidden outright). The toolbar itself shows the [`iced_fabi::Tool`] API: the built-in [`iced_fabi::BuiltInTool`] set (create folder, copy, paste) arrives with one `built_in_tools` call, the custom [`DuplicateHere`] is the demo's own `Tool` carrying a selection's subtree and sits among the custom tools, and the destructive delete joins last behind a [`iced_fabi::Cabinet::tool_separator`]; a `Tools` dropdown switches any of them off ([`Browser::hide_tool`](iced_fabi::Browser::hide_tool)); selecting is done purely through the checkboxes. The column list gets one custom [`TypeColumn`], and a `Columns` dropdown switches which of the columns are drawn ([`Browser::hide_column`] / [`Browser::show_column`]; [`Browser::set_visible_columns`] is the same in one call at init).
 //!
 //! Run: `cargo run --example cloud_browse` — then switch modes with the icon in the top right, tap folders to drill down, tap the boxes to select (press and hold a row first when "Boxes" is on *on long press*), and watch the parent markers turn into dots.
 
@@ -42,6 +42,7 @@ enum Message {
     Entries(EntryChoice),
     Selection(SelectionChoice),
     Action(ActionChoice),
+    ModeSwitch(ModeSwitchChoice),
     ColumnToggle(ColumnKey),
     ToolToggle(ToolKey),
     Duplicate,
@@ -68,8 +69,8 @@ mod theme;
 
 use choices::{
     ACTION_CHOICES, ActionChoice, BOXES_CHOICES, BoxesChoice, ENTRY_CHOICES, EntryChoice,
-    ICON_CHOICES, INACTIVE_CHOICES, IconChoice, InactiveChoice, LINES, SELECTION_CHOICES,
-    SelectionChoice, THEMES, ThemeChoice, ZEBRA, ZebraChoice,
+    ICON_CHOICES, INACTIVE_CHOICES, IconChoice, InactiveChoice, LINES, MODE_SWITCH,
+    ModeSwitchChoice, SELECTION_CHOICES, SelectionChoice, THEMES, ThemeChoice, ZEBRA, ZebraChoice,
 };
 use icons::MaterialIconTheme;
 use theme::{
@@ -111,6 +112,7 @@ struct App {
     entries: EntryChoice,
     selection: SelectionChoice,
     action: ActionChoice,
+    mode_switch: ModeSwitchChoice,
     /// The Columns dropdown's entries, refreshed whenever the columns change.
     column_options: Vec<ColumnOption>,
     /// The Tools dropdown's entries, refreshed whenever the tools change.
@@ -219,6 +221,7 @@ impl App {
             entries: EntryChoice::All,
             selection: SelectionChoice::Multiple,
             action: ActionChoice::Wide,
+            mode_switch: ModeSwitchChoice::Shown,
             column_options: Vec::new(),
             tool_options: Vec::new(),
         };
@@ -278,6 +281,10 @@ impl App {
             }
             Message::Action(choice) => {
                 self.action = choice;
+                Task::none()
+            }
+            Message::ModeSwitch(choice) => {
+                self.mode_switch = choice;
                 Task::none()
             }
             Message::CreateFolder => {
@@ -526,6 +533,14 @@ impl App {
                 ),
                 label("Tools"),
                 tools_list(&self.tool_options, syncative),
+                label("Mode switch"),
+                dropdown(
+                    MODE_SWITCH,
+                    &self.mode_switch,
+                    Message::ModeSwitch,
+                    100.0,
+                    syncative
+                ),
             ]
             .spacing(8)
             .align_y(iced::Alignment::Center),
@@ -558,7 +573,9 @@ impl App {
             .icons(icons)
             .separators(self.lines)
             // The app's default_font is Noto Sans under every theme (see `main`), so the cabinet labels with it too; without it its semibold breadcrumb and "N selected" fall back to iced's default family.
-            .font(SYNCATIVE_FONT);
+            .font(SYNCATIVE_FONT)
+            // The Mode switch dropdown: off drops the browse/tree button and its divider from the bar entirely.
+            .show_mode_toggle(self.mode_switch == ModeSwitchChoice::Shown);
         if syncative {
             cabinet = cabinet
                 .text_size(SYNCATIVE_TEXT)

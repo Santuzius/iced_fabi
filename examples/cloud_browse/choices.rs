@@ -158,6 +158,25 @@ pub(crate) const ACTION_CHOICES: &[ActionChoice] = &[
     ActionChoice::Toolbar,
 ];
 
+/// Whether the cabinet's browse/tree mode switch button is drawn (the [`iced_fabi::Cabinet::show_mode_toggle`] setting; its divider to the tools goes with it).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum ModeSwitchChoice {
+    Shown,
+    Hidden,
+}
+
+impl fmt::Display for ModeSwitchChoice {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(match self {
+            Self::Shown => "shown",
+            Self::Hidden => "hidden",
+        })
+    }
+}
+
+pub(crate) const MODE_SWITCH: &[ModeSwitchChoice] =
+    &[ModeSwitchChoice::Shown, ModeSwitchChoice::Hidden];
+
 pub(crate) const LINES: &[iced_fabi::Separators] = &[
     iced_fabi::Separators::None,
     iced_fabi::Separators::HeaderOnly,
