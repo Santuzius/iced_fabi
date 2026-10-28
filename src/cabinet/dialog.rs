@@ -3,12 +3,13 @@
 use std::rc::Rc;
 
 use iced_widget::{
-    button, container, mouse_area, opaque, row, Column, Space,
+    Column, Space, button, container,
     core::{Alignment, Background, Color, Element, Font, Length, Theme, border},
+    mouse_area, opaque, row,
 };
 
-use super::paint::ColourField;
 use super::Cabinet;
+use super::paint::ColourField;
 
 /// Width of the dialog card.
 pub(super) const CARD_WIDTH: f32 = 300.0;
@@ -35,19 +36,19 @@ where
     ) -> Element<'a, Message, Theme, Renderer> {
         let card_style = Rc::clone(&self.style);
         container(lines.spacing(LINE_GAP).padding(CARD_PADDING))
-        .width(Length::Fixed(CARD_WIDTH))
-        .style(move |theme| {
-            let appearance = card_style(theme);
-            container::Style {
-                background: Some(Background::Color(appearance.background)),
-                text_color: Some(appearance.text),
-                border: border::rounded(appearance.radius)
-                    .width(1.0)
-                    .color(appearance.line),
-                ..container::Style::default()
-            }
-        })
-        .into()
+            .width(Length::Fixed(CARD_WIDTH))
+            .style(move |theme| {
+                let appearance = card_style(theme);
+                container::Style {
+                    background: Some(Background::Color(appearance.background)),
+                    text_color: Some(appearance.text),
+                    border: border::rounded(appearance.radius)
+                        .width(1.0)
+                        .color(appearance.line),
+                    ..container::Style::default()
+                }
+            })
+            .into()
     }
 
     /// The modal's action button, filled in the confirmation's [`ConfirmTone`]: accent by default, danger red for a destructive action, so the eye lands on it and a destructive one warns in its colour.
@@ -63,12 +64,16 @@ where
             .style(move |theme, status| {
                 let appearance = confirm_style(theme);
                 let (fill, hover, on_fill) = match tone {
-                    crate::ConfirmTone::Accent => {
-                        (appearance.accent, appearance.accent_hover, appearance.on_accent)
-                    }
-                    crate::ConfirmTone::Danger => {
-                        (appearance.danger, appearance.danger_hover, appearance.on_danger)
-                    }
+                    crate::ConfirmTone::Accent => (
+                        appearance.accent,
+                        appearance.accent_hover,
+                        appearance.on_accent,
+                    ),
+                    crate::ConfirmTone::Danger => (
+                        appearance.danger,
+                        appearance.danger_hover,
+                        appearance.on_danger,
+                    ),
                 };
                 let background = match status {
                     button::Status::Hovered | button::Status::Pressed => hover,

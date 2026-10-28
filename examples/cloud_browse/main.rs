@@ -396,8 +396,16 @@ impl App {
     }
 
     /// Ask for the listings of every folder in a just-installed listing as well, so the browser ends up knowing the whole tree: the delete confirmation then counts every descendant of a selection, also the ones under collapsed folders and in browse mode. Each queued load is no less delayed by the fake backend than one asked for by navigation, and one that raced a navigation just no-ops like any other.
-    fn queue_folder_loads(&mut self, parent: iced_fabi::NodeId, parent_path: &str, listing: &[Entry]) {
-        for entry in listing.iter().filter(|entry| entry.kind == EntryKind::Folder) {
+    fn queue_folder_loads(
+        &mut self,
+        parent: iced_fabi::NodeId,
+        parent_path: &str,
+        listing: &[Entry],
+    ) {
+        for entry in listing
+            .iter()
+            .filter(|entry| entry.kind == EntryKind::Folder)
+        {
             self.pending.push(Pending {
                 node: iced_fabi::NodeId::derive(parent, EntryKind::Folder, &entry.name),
                 path: if parent_path.is_empty() {
@@ -485,10 +493,7 @@ impl App {
                 list.into()
             }
         }
-        fn columns_list<'a>(
-            options: &'a [ColumnOption],
-            syncative: bool,
-        ) -> Element<'a, Message> {
+        fn columns_list<'a>(options: &'a [ColumnOption], syncative: bool) -> Element<'a, Message> {
             let list = iced::widget::pick_list(options, None::<&ColumnOption>, |option| {
                 Message::ColumnToggle(option.key.clone())
             })
@@ -503,10 +508,7 @@ impl App {
                 list.into()
             }
         }
-        fn tools_list<'a>(
-            options: &'a [ToolOption],
-            syncative: bool,
-        ) -> Element<'a, Message> {
+        fn tools_list<'a>(options: &'a [ToolOption], syncative: bool) -> Element<'a, Message> {
             let list = iced::widget::pick_list(options, None::<&ToolOption>, |option| {
                 Message::ToolToggle(option.key.clone())
             })
@@ -753,7 +755,11 @@ impl Tool<Message> for DuplicateHere {
         Message::Duplicate
     }
 
-    fn confirmation(&self, browser: &Browser, _labels: &iced_fabi::Labels) -> Option<iced_fabi::ToolConfirmation> {
+    fn confirmation(
+        &self,
+        browser: &Browser,
+        _labels: &iced_fabi::Labels,
+    ) -> Option<iced_fabi::ToolConfirmation> {
         // A custom modal, the demo's own words: the cabinet asks again each frame, so the count tracks the live selection. The confirm button names the act.
         Some(iced_fabi::ToolConfirmation {
             title: "Duplicate here?".into(),

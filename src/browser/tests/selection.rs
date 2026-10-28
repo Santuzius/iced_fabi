@@ -324,7 +324,10 @@ fn entry_counts_cover_listed_subtrees_and_count_each_entry_once() {
 
     let nested = NodeId::derive(finanzen, EntryKind::Folder, "2025");
     let mut absorbed = Browser::sample();
-    absorbed.set_children(finanzen, vec![Entry::file("beleg.pdf"), Entry::folder("2025")]);
+    absorbed.set_children(
+        finanzen,
+        vec![Entry::file("beleg.pdf"), Entry::folder("2025")],
+    );
     absorbed.set_children(nested, vec![Entry::file("quartal1.pdf")]);
     absorbed.toggle(nested);
     assert_eq!(

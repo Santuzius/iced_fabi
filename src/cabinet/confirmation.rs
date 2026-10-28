@@ -30,16 +30,14 @@ where
         }
         let card = self.dialog_card(
             lines
-                .push(
-                    self.dialog_buttons(
-                        self.cancel_button(cancel.clone()),
-                        self.confirm_button(
-                            confirmation.confirm.clone(),
-                            confirmation.tone,
-                            confirm_press,
-                        ),
+                .push(self.dialog_buttons(
+                    self.cancel_button(cancel.clone()),
+                    self.confirm_button(
+                        confirmation.confirm.clone(),
+                        confirmation.tone,
+                        confirm_press,
                     ),
-                )
+                ))
                 .spacing(super::dialog::LINE_GAP),
         );
         self.dialog_layer(card, cancel)

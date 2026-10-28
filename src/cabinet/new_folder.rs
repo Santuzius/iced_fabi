@@ -3,8 +3,9 @@
 use std::rc::Rc;
 
 use iced_widget::{
-    column, text_input,
+    column,
     core::{Element, Font, Length, Theme},
+    text_input,
 };
 
 use super::Cabinet;
@@ -41,16 +42,14 @@ where
         ];
         let card = self.dialog_card(
             lines
-                .push(
-                    self.dialog_buttons(
-                        self.cancel_button(cancel.clone()),
-                        self.confirm_button(
-                            self.labels.create.clone(),
-                            crate::ConfirmTone::Accent,
-                            confirm,
-                        ),
+                .push(self.dialog_buttons(
+                    self.cancel_button(cancel.clone()),
+                    self.confirm_button(
+                        self.labels.create.clone(),
+                        crate::ConfirmTone::Accent,
+                        confirm,
                     ),
-                )
+                ))
                 .spacing(super::dialog::LINE_GAP),
         );
         self.dialog_layer(card, cancel)

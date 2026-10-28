@@ -155,10 +155,7 @@ pub(crate) fn syncative_page(theme: &Theme) -> iced::widget::container::Style {
 }
 
 /// Syncative's raised card (`theme::card`). Its `radius` is the one the cabinet's own style paints its corners with, so the modal scrim's darkening follows the card's rounded corners; the card hugs the cabinet (no padding) for the same reason.
-pub(crate) fn syncative_card(
-    theme: &Theme,
-    radius: f32,
-) -> iced::widget::container::Style {
+pub(crate) fn syncative_card(theme: &Theme, radius: f32) -> iced::widget::container::Style {
     let t = syncative_tones(theme);
     iced::widget::container::Style {
         background: Some(t.surface.into()),

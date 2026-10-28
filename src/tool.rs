@@ -1,7 +1,7 @@
 //! Toolbar tools an app adds to the cabinet's bar: the [`Tool`] trait and the closure-built [`SimpleTool`].
 
-use crate::browser::Browser;
 use crate::Labels;
+use crate::browser::Browser;
 
 /// How the confirm button of a [`ToolConfirmation`] is coloured.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]

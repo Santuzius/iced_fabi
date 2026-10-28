@@ -35,7 +35,10 @@ fn confirming_hands_the_tool_back_exactly_once() {
     );
     assert_eq!(browser.pending_tool_confirmation(), None);
     // A confirm that reaches the browser twice must not run the tool twice.
-    assert_eq!(browser.update(Event::ToolConfirmationConfirmed), Outcome::None);
+    assert_eq!(
+        browser.update(Event::ToolConfirmationConfirmed),
+        Outcome::None
+    );
 }
 
 #[test]
@@ -45,16 +48,28 @@ fn cancelling_runs_nothing_and_a_later_confirm_is_silent() {
         tool: ToolKey::custom(DELETE),
     };
     let _ = browser.update(request);
-    assert_eq!(browser.update(Event::ToolConfirmationCancelled), Outcome::None);
+    assert_eq!(
+        browser.update(Event::ToolConfirmationCancelled),
+        Outcome::None
+    );
     assert_eq!(browser.pending_tool_confirmation(), None);
-    assert_eq!(browser.update(Event::ToolConfirmationConfirmed), Outcome::None);
+    assert_eq!(
+        browser.update(Event::ToolConfirmationConfirmed),
+        Outcome::None
+    );
 }
 
 #[test]
 fn events_on_a_closed_modal_do_nothing() {
     let mut browser = Browser::sample();
-    assert_eq!(browser.update(Event::ToolConfirmationConfirmed), Outcome::None);
-    assert_eq!(browser.update(Event::ToolConfirmationCancelled), Outcome::None);
+    assert_eq!(
+        browser.update(Event::ToolConfirmationConfirmed),
+        Outcome::None
+    );
+    assert_eq!(
+        browser.update(Event::ToolConfirmationCancelled),
+        Outcome::None
+    );
     assert_eq!(browser.pending_tool_confirmation(), None);
 }
 

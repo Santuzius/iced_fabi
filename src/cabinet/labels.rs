@@ -44,10 +44,18 @@ impl Default for Labels<'_> {
             delete_count: Box::new(|folders, files| {
                 let mut parts = Vec::new();
                 if folders > 0 {
-                    parts.push(format!("{} folder{}", folders, if folders == 1 { "" } else { "s" }));
+                    parts.push(format!(
+                        "{} folder{}",
+                        folders,
+                        if folders == 1 { "" } else { "s" }
+                    ));
                 }
                 if files > 0 {
-                    parts.push(format!("{} file{}", files, if files == 1 { "" } else { "s" }));
+                    parts.push(format!(
+                        "{} file{}",
+                        files,
+                        if files == 1 { "" } else { "s" }
+                    ));
                 }
                 parts.join(", ")
             }),
@@ -68,14 +76,19 @@ impl<'a> Labels<'a> {
             create: "Erstellen".into(),
             cancel: "Abbrechen".into(),
             delete: "Löschen".into(),
-            delete_question: "Sind Sie sicher, dass Sie die markierten Einträge löschen möchten?".into(),
+            delete_question: "Sind Sie sicher, dass Sie die markierten Einträge löschen möchten?"
+                .into(),
             delete_count: Box::new(|folders, files| {
                 let mut parts = Vec::new();
                 if folders > 0 {
                     parts.push(format!("{folders} Ordner"));
                 }
                 if files > 0 {
-                    parts.push(format!("{} Datei{}", files, if files == 1 { "" } else { "en" }));
+                    parts.push(format!(
+                        "{} Datei{}",
+                        files,
+                        if files == 1 { "" } else { "en" }
+                    ));
                 }
                 parts.join(", ")
             }),

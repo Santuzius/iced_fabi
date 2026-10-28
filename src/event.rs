@@ -1,7 +1,7 @@
 //! What the cabinet widget reports back to the application. Apps hand each [`Event`] straight to [`Browser::update`]; they never construct or match on them, so the enum is `#[non_exhaustive]` and the variants are named after what the user *did*, not after the state method that happens to apply it.
 
-use crate::browser::node::NodeId;
 use crate::ToolKey;
+use crate::browser::node::NodeId;
 
 /// One interaction inside the widget. Route it with [`update`](crate::Browser::update).
 #[derive(Debug, Clone, PartialEq, Eq)]

@@ -101,11 +101,11 @@ where
                             None => {
                                 let asks = tool.confirmation(self.browser, &self.labels).is_some();
                                 match (asks, tool.id()) {
-                                    (true, Some(id)) => (self.on_event)(
-                                        crate::Event::ToolConfirmationRequested {
+                                    (true, Some(id)) => {
+                                        (self.on_event)(crate::Event::ToolConfirmationRequested {
                                             tool: crate::ToolKey::custom(id),
-                                        },
-                                    ),
+                                        })
+                                    }
                                     _ => tool.message(self.browser),
                                 }
                             }
