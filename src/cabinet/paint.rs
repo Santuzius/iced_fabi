@@ -299,6 +299,51 @@ pub(super) fn stripe_of(background: Color, header: Color, stripe: f32) -> Color 
     crate::style::mix(background, towards, factor)
 }
 
+/// WCAG relative luminance of an sRGB colour (alpha ignored).
+fn luminance(color: Color) -> f32 {
+    let linear = |c: f32| {
+        if c <= 0.040_45 {
+            c / 12.92
+        } else {
+            ((c + 0.055) / 1.055).powf(2.4)
+        }
+    };
+    0.2126 * linear(color.r) + 0.7152 * linear(color.g) + 0.0722 * linear(color.b)
+}
+
+/// WCAG contrast ratio of two colours, 1 (same luminance) to 21 (black on white).
+fn contrast(a: Color, b: Color) -> f32 {
+    let (la, lb) = (luminance(a), luminance(b));
+    (la.max(lb) + 0.05) / (la.min(lb) + 0.05)
+}
+
+/// The band behind a selected row, bounded by the tick on it the way [`stripe_of`] bounds the stripe by the header: the [`Style::selection`] colour (laid over `background`, since an app's may be translucent) may sit at most halfway from the background to the [`Style::accent`], halfway measured in contrast — the tick keeps at least the square root of its contrast to the background, so it never stands off its row less than the row stands off the background. iced's palettes derive the selection from the accent, so on a dark theme the band can come out nearly in the tick's own colour and the tick vanishes into it; a band past halfway gives way towards the background by the smallest step that gets there. A band nearer the background stays as it is.
+pub(super) fn selection_of(background: Color, selection: Color, accent: Color) -> Color {
+    let background = Color {
+        a: 1.0,
+        ..background
+    };
+    let accent = Color { a: 1.0, ..accent };
+    let band = crate::style::mix(
+        background,
+        Color {
+            a: 1.0,
+            ..selection
+        },
+        selection.a,
+    );
+    let floor = contrast(accent, background).sqrt();
+    if contrast(accent, band) >= floor {
+        return band;
+    }
+    // Searched on a grid rather than solved: the contrast need not change monotonically along the way, and the first grid step that clears the floor is the smallest one. At the background itself the tick has its full contrast, which is never below its square root, so the search always ends.
+    const STEPS: u16 = 64;
+    (1..=STEPS)
+        .map(|step| crate::style::mix(band, background, f32::from(step) / f32::from(STEPS)))
+        .find(|candidate| contrast(accent, *candidate) >= floor)
+        .unwrap_or(background)
+}
+
 fn length(width: ColumnWidth) -> Length {
     match width {
         ColumnWidth::Fill => Length::Fill,
@@ -309,8 +354,53 @@ fn length(width: ColumnWidth) -> Length {
 
 #[cfg(test)]
 mod tests {
-    use super::stripe_of;
+    use super::{contrast, selection_of, stripe_of};
     use iced_widget::core::Color;
+
+    /// A band the tick already reads on stays the app's colour.
+    #[test]
+    fn a_band_the_tick_reads_on_stays() {
+        let background = Color::WHITE;
+        let selection = Color::from_rgb8(0xdd, 0xe7, 0xf4);
+        let accent = Color::from_rgb8(0x2a, 0x73, 0xc5);
+        assert_eq!(selection_of(background, selection, accent), selection);
+    }
+
+    /// The bug this prevents: on iced's Default dark the tick (the primary, 88/101/242) sat on the band (primary.weak, 74/84/195) at 1.36 : 1 and vanished — pixels measured on the picker example, background 43/45/49. The band must give way to halfway in contrast, and no further.
+    #[test]
+    fn a_band_of_the_ticks_own_hue_gives_way_to_halfway() {
+        let background = Color::from_rgb8(43, 45, 49);
+        let selection = Color::from_rgb8(74, 84, 195);
+        let accent = Color::from_rgb8(88, 101, 242);
+        let halfway = contrast(accent, background).sqrt();
+        assert!(contrast(accent, selection) < halfway, "the case is real");
+        let band = selection_of(background, selection, accent);
+        assert!(contrast(accent, band) >= halfway);
+        assert!(
+            contrast(band, background) > 1.6,
+            "the row still stands off the background about as much"
+        );
+        // The step the search took, read back off the blue channel, and the grid step before it.
+        let taken = (selection.b - band.b) / (selection.b - background.b);
+        let one_step_less = crate::style::mix(selection, background, taken - 1.0 / 64.0);
+        assert!(
+            contrast(accent, one_step_less) < halfway,
+            "the smallest step that reaches halfway"
+        );
+    }
+
+    /// A translucent selection is judged as it shows: over the background.
+    #[test]
+    fn a_translucent_selection_is_laid_over_the_background() {
+        let background = Color::WHITE;
+        let selection = Color {
+            a: 0.5,
+            ..Color::BLACK
+        };
+        let accent = Color::BLACK;
+        let band = selection_of(background, selection, accent);
+        assert!((band.r - 0.5).abs() < 1e-6 && band.a == 1.0);
+    }
 
     /// The bug this prevents: stripes mixed towards white vanished on light backgrounds.
     #[test]

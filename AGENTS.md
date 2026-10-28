@@ -38,3 +38,7 @@ For a target that is not listed, take the shot with `GRID=50` and no steps, then
 - light themes, strong: stripe equals the header, never darker (Syncative light 255 / 235 / 236, Default light 255 / 240 / 240)
 - light themes, subtle: strictly lighter than the header, about 5–6 levels below the background (Syncative light 255 / 235 / 249, Default light 255 / 240 / 250)
 - Syncative dark: the full factor, its header is 40 % off the background (subtle 42 / 24 / 37, strong 42 / 24 / 27)
+
+## Verifying the selection band against the tick
+
+`selection_of` in `src/cabinet/paint.rs` bounds the selected row's band by the accent tick, as `stripe_of` bounds the stripe by the header: the tick keeps at least the square root of its contrast to the background. Tick the first row of the `picker` example's Folder picker and scan across it (`SCAN=y=208`): on Default dark, background 43 / 45 / 49, the band comes out 65 / 72 / 152 and the tick stays the accent 88 / 101 / 242 (1.75 : 1, halfway 1.73; the unbounded band 74 / 84 / 195 gave 1.36). Syncative light and dark sit well past halfway (3.86 and 3.88 against 2.2) and keep their band.

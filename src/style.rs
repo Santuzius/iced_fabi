@@ -23,7 +23,7 @@ pub struct Style {
     pub on_danger: Color,
     /// Tint of the folder glyphs of tinted icon packs.
     pub folder: Color,
-    /// Row background while selected.
+    /// Row background while selected. It gives way towards [`background`](Self::background) as far as the [`accent`](Self::accent) tick needs to keep a 3 : 1 contrast on it — the selection's counterpart of the header bounding the [`stripe`](Self::stripe).
     pub selection: Color,
     /// Row background under the pointer; keep it weaker than [`selection`](Self::selection).
     pub row_hover: Color,

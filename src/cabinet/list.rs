@@ -190,7 +190,11 @@ where
                     .style(move |theme, status| {
                         let appearance = style(theme);
                         let background = if selected {
-                            Some(appearance.selection)
+                            Some(super::paint::selection_of(
+                                appearance.background,
+                                appearance.selection,
+                                appearance.accent,
+                            ))
                         } else if matches!(
                             status,
                             button::Status::Hovered | button::Status::Pressed
