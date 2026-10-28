@@ -16,6 +16,33 @@ struct CutState {
     text: String,
 }
 
+/// The text to draw for `label` in a cell `avail` wide: `label` whole when `measure` says it fits, else the longest prefix that fits with `…` glued on (spaces and `/` right before the ellipsis are trimmed). When not even one character fits, the result is just `…`. `measure` is called with the whole label and with candidate prefixes plus the ellipsis; the binary search is over the prefix length.
+fn fit(label: &str, avail: f32, mut measure: impl FnMut(&str) -> f32) -> String {
+    if label.is_empty() || measure(label) <= avail {
+        return label.to_owned();
+    }
+    // Binary search the longest prefix that fits with the ellipsis glued on, then trim what would sit right before it.
+    let mut best = 0usize;
+    let mut low = 1usize;
+    let mut high = label.chars().count() - 1;
+    while low <= high {
+        let keep = (low + high) / 2;
+        let prefix: String = label.chars().take(keep).collect();
+        if measure(&format!("{prefix}…")) <= avail {
+            best = keep;
+            low = keep + 1;
+        } else {
+            high = keep - 1;
+        }
+    }
+    let mut cut: String = label.chars().take(best).collect();
+    while cut.ends_with(' ') || cut.ends_with('/') {
+        cut.pop();
+    }
+    cut.push('…');
+    cut
+}
+
 /// A label that is cut to the width its cell actually got: iced's `Text` neither clips nor ellipsizes (0.14). At layout time the final width is already known (flex columns are resolved before their children are laid out), so the full label is measured exactly — through the renderer's own paragraph implementation, i.e. the same text that gets drawn — and when it does not fit, the longest prefix that fits together with the ellipsis is handed to `Text`. No caller-side width bookkeeping; labels whose cell is wide enough stay whole. It fills its cell and centres the text vertically.
 pub(crate) struct Cut<'c, Message, Renderer: core_text::Renderer> {
     label: String,
@@ -102,28 +129,7 @@ where
                 });
                 paragraph.raw().min_width()
             };
-            if measured(&self.label) > avail {
-                // Binary search the longest prefix that fits with the ellipsis glued on, then trim what would sit right before it.
-                let mut best = 0usize;
-                let mut low = 1usize;
-                let mut high = self.label.chars().count() - 1;
-                while low <= high {
-                    let keep = (low + high) / 2;
-                    let prefix: String = self.label.chars().take(keep).collect();
-                    if measured(&format!("{prefix}…")) <= avail {
-                        best = keep;
-                        low = keep + 1;
-                    } else {
-                        high = keep - 1;
-                    }
-                }
-                let mut cut: String = self.label.chars().take(best).collect();
-                while cut.ends_with(' ') || cut.ends_with('/') {
-                    cut.pop();
-                }
-                cut.push('…');
-                state.text = cut;
-            }
+            state.text = fit(&self.label, avail, &mut measured);
         }
         // Hand the chosen prefix to the Text child (it diffs cheaply, and its paragraph diffs cheaply when the text did not change).
         let colour = Rc::clone(&self.colour);
@@ -176,5 +182,67 @@ where
 {
     fn from(cut: Cut<'c, Message, Renderer>) -> Self {
         Element::new(cut)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::fit;
+
+    /// Stand-in measure for the renderer: every glyph is one unit wide.
+    fn chars_as_units(content: &str) -> f32 {
+        content.chars().count() as f32
+    }
+
+    #[test]
+    fn label_that_fits_stays_whole() {
+        assert_eq!(fit("notes.txt", 20.0, chars_as_units), "notes.txt");
+        assert_eq!(
+            fit("abc", 3.0, chars_as_units),
+            "abc",
+            "exact fit counts as fitting"
+        );
+        assert_eq!(
+            fit("", 5.0, chars_as_units),
+            "",
+            "an empty label stays empty"
+        );
+    }
+
+    #[test]
+    fn longest_prefix_fits_with_the_ellipsis() {
+        // five chars plus the ellipsis are exactly six units.
+        assert_eq!(fit("abcdefghij", 6.0, chars_as_units), "abcde…");
+        assert_eq!(
+            fit("abcdefghij", 5.0, chars_as_units),
+            "abcd…",
+            "one unit less room, one char less"
+        );
+    }
+
+    #[test]
+    fn space_and_slash_before_the_ellipsis_are_trimmed() {
+        // the best prefix would end right after "ab" with a space or slash dangling before the ellipsis.
+        assert_eq!(fit("ab cd", 4.0, chars_as_units), "ab…");
+        assert_eq!(fit("ab/cd", 4.0, chars_as_units), "ab…");
+    }
+
+    #[test]
+    fn one_character_label() {
+        assert_eq!(fit("a", 1.0, chars_as_units), "a", "fits whole");
+        assert_eq!(
+            fit("a", 0.5, chars_as_units),
+            "…",
+            "cut to nothing leaves just the ellipsis"
+        );
+    }
+
+    #[test]
+    fn cell_too_narrow_for_anything() {
+        assert_eq!(
+            fit("abcdefghij", 0.5, chars_as_units),
+            "…",
+            "not even one char plus ellipsis fits"
+        );
     }
 }

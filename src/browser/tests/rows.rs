@@ -81,6 +81,69 @@ fn folders_only_hides_files_in_both_modes() {
 }
 
 #[test]
+fn tree_rows_carry_depth_and_display_order() {
+    let mut browser = Browser::sample();
+    browser.set_mode(crate::Mode::Tree);
+    let folder = NodeId::derive(NodeId::ROOT, EntryKind::Folder, "Finanzen");
+    let _ = browser.activate(folder); // in tree mode this opens the branch and asks for its listing
+    browser.set_children(
+        folder,
+        vec![Entry::file("beleg.pdf"), Entry::folder("Krypto")],
+    );
+    let shape: Vec<(String, usize, bool, bool)> = browser
+        .tree_rows()
+        .iter()
+        .map(|row| {
+            (
+                browser.node(row.id).expect("listed node").name.clone(),
+                row.depth,
+                row.expandable,
+                row.expanded,
+            )
+        })
+        .collect();
+    assert_eq!(
+        shape,
+        vec![
+            ("My files".to_owned(), 0, true, true),
+            ("Finanzen".to_owned(), 1, true, true),
+            ("Krypto".to_owned(), 2, true, false),
+            ("beleg.pdf".to_owned(), 2, false, false),
+            ("notes.txt".to_owned(), 1, false, false),
+        ],
+        "folders first, name asc, every level one deeper, an unopened folder keeps its caret"
+    );
+}
+
+#[test]
+fn collapsing_a_branch_hides_its_child_rows() {
+    let mut browser = Browser::sample();
+    browser.set_mode(crate::Mode::Tree);
+    let folder = NodeId::derive(NodeId::ROOT, EntryKind::Folder, "Finanzen");
+    let _ = browser.activate(folder);
+    browser.set_children(folder, vec![Entry::file("beleg.pdf")]);
+    let names = |browser: &Browser| -> Vec<String> {
+        browser
+            .tree_rows()
+            .iter()
+            .map(|row| browser.node(row.id).expect("listed node").name.clone())
+            .collect()
+    };
+    assert_eq!(
+        names(&browser),
+        vec!["My files", "Finanzen", "beleg.pdf", "notes.txt"],
+        "open branch: the child sits under it"
+    );
+    let _ = browser.activate(folder); // the caret again: closed
+    assert!(!browser.is_expanded(folder));
+    assert_eq!(
+        names(&browser),
+        vec!["My files", "Finanzen", "notes.txt"],
+        "the child row is gone, the branch row stays"
+    );
+}
+
+#[test]
 fn file_extension_filter_keeps_folders_and_matching_files() {
     let mut browser = Browser::sample();
     browser.set_file_extensions(["txt"]);

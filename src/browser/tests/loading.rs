@@ -106,3 +106,29 @@ fn remove_drops_nested_ids_once_and_refuses_the_root() {
         "the root scope cannot be deleted"
     );
 }
+
+#[test]
+fn removing_the_current_folder_moves_the_view_to_its_parent() {
+    let mut browser = Browser::sample();
+    let folder = NodeId::derive(NodeId::ROOT, EntryKind::Folder, "Finanzen");
+    let _ = browser.activate(folder);
+    browser.set_children(folder, vec![Entry::folder("Krypto")]);
+    let krypto = NodeId::derive(folder, EntryKind::Folder, "Krypto");
+    let _ = browser.activate(krypto);
+    browser.remove(&[krypto]);
+    assert_eq!(
+        browser.current(),
+        folder,
+        "the view fell back to the parent, not all the way to the root"
+    );
+    assert_eq!(
+        browser.path(),
+        &[NodeId::ROOT, folder],
+        "the breadcrumb lost the deleted leg"
+    );
+    let node = browser.node(folder).expect("Finanzen");
+    assert!(
+        !node.children.contains(&krypto),
+        "the parent's listing lost the entry"
+    );
+}
