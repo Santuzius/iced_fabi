@@ -300,7 +300,7 @@ impl Browser {
         }
     }
 
-    /// Unticks one covered entry while the rest of the selected `ancestor`'s subtree stays selected: the unit is dissolved along the chain from the ancestor down to `id`, re-entering every listed child as an explicit unit except the one the chain leads through. That loses nothing: `id` shows on screen, so every folder on the chain is expanded and listed, and the re-entered siblings cover their unloaded subtrees themselves. The chain's folders end up Partial, `id` itself Unselected.
+    /// Unticks one covered entry while the rest of the selected `ancestor`'s subtree stays selected: the unit is dissolved along the chain from the ancestor down to `id`, re-entering every listed child (hidden ones, e.g. files under [`set_folders_only`](Self::set_folders_only), are dropped) as an explicit unit except the one the chain leads through. That loses nothing: `id` shows on screen, so every folder on the chain is expanded and listed, and the re-entered siblings cover their unloaded subtrees themselves. The chain's folders end up Partial, `id` itself Unselected.
     fn uncheck_below(&mut self, ancestor: NodeId, id: NodeId) {
         self.selected.remove(&ancestor);
         let mut chain: Vec<NodeId> = Vec::new();
@@ -318,8 +318,9 @@ impl Browser {
                 Some(node) => node.children.clone(),
                 None => break,
             };
+            // Only listed siblings re-enter, as with select-all: a folders-only picker must not end up with file units it never showed.
             for sibling in siblings {
-                if sibling != *step {
+                if sibling != *step && self.is_listed(sibling) {
                     self.selected.insert(sibling);
                 }
             }

@@ -347,3 +347,25 @@ fn entry_counts_cover_listed_subtrees_and_count_each_entry_once() {
         "finanzen + 2025 as folders, beleg.pdf + quartal1.pdf as files, each once"
     );
 }
+
+#[test]
+fn unticking_inside_a_selected_folder_only_re_enters_listed_siblings() {
+    let mut browser = Browser::sample();
+    browser.set_folders_only(true);
+    let folder = NodeId::derive(NodeId::ROOT, EntryKind::Folder, "Finanzen");
+    browser.set_children(
+        folder,
+        vec![
+            Entry::folder("2024"),
+            Entry::folder("2025"),
+            Entry::file("beleg.pdf"),
+        ],
+    );
+    browser.toggle(folder);
+    browser.toggle(NodeId::derive(folder, EntryKind::Folder, "2024"));
+    assert_eq!(
+        browser.selected().collect::<Vec<_>>(),
+        vec![NodeId::derive(folder, EntryKind::Folder, "2025")],
+        "the hidden beleg.pdf does not become a unit the list never showed"
+    );
+}
