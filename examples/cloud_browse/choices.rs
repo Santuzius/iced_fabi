@@ -134,12 +134,13 @@ pub(crate) const SELECTION_CHOICES: &[SelectionChoice] = &[
     SelectionChoice::None,
 ];
 
-/// Where the action button triggered by a selection sits.
+/// Where the action button triggered by a selection sits, or that the cabinet gets none at all.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum ActionChoice {
     Wide,
     Floating,
     Toolbar,
+    None,
 }
 
 impl fmt::Display for ActionChoice {
@@ -148,6 +149,7 @@ impl fmt::Display for ActionChoice {
             Self::Wide => "under list",
             Self::Floating => "floating",
             Self::Toolbar => "toolbar",
+            Self::None => "none",
         })
     }
 }
@@ -156,6 +158,7 @@ pub(crate) const ACTION_CHOICES: &[ActionChoice] = &[
     ActionChoice::Wide,
     ActionChoice::Floating,
     ActionChoice::Toolbar,
+    ActionChoice::None,
 ];
 
 /// Whether the cabinet's browse/tree mode switch button is drawn (the [`iced_fabi::Cabinet::show_mode_toggle`] setting; its divider to the tools goes with it).

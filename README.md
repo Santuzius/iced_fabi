@@ -51,7 +51,7 @@ cargo run --example minimal       # the whole API surface on ~100 lines, straigh
 cargo run --example cloud_browse  # a fake cloud drive answering one tick late
 ```
 
-The cloud demo's bar switches every setting live: theme (including a reproduction of Syncative's palette and [`Style`]), icon pack, separator grid, zebra stripe, which entries are listed (all or folders only), selection (`multiple` / `single` / `none`), how the boxes appear (`shown` / `on long press` / `hidden`), where the action button sits, and what happens to inapplicable toolbar tools (greyed or hidden).
+The cloud demo's bar switches every setting live: theme (including a reproduction of Syncative's palette and [`Style`]), icon pack, separator grid, zebra stripe, which entries are listed (all or folders only), selection (`multiple` / `single` / `none`), how the boxes appear (`shown` / `on long press` / `hidden`), where the action button sits (or that the cabinet gets none), and what happens to inapplicable toolbar tools (greyed or hidden).
 
 Icons: [Tabler Icons](https://tabler.io/icons) (MIT) and the three selection checkboxes from [IcoMoon Free](https://github.com/Keyamoon/IcoMoon-Free) (GPL-3.0-or-later, © Keyamoon) via [`icondata`](https://crates.io/crates/icondata). The demo also carries a cut of the [Material Icon Theme](https://github.com/material-extensions/vscode-material-icon-theme) (MIT, © Material Extensions, v5.39.0) under `examples/assets/material-icon-theme/` with the upstream license text; provenance in [NOTICE](NOTICE).
 

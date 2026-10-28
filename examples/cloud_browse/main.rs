@@ -1,6 +1,6 @@
 //! A cloud directory browser without the cloud: the listings come from a fake backend that answers every request one tick late, so the `activate → NeedsLoad → set_children` round-trip and its loading states behave like a real network drive.
 //!
-//! The bar above the cabinet demos the configuration hooks with dropdowns: the [`iced::Theme`] (including a reproduction of Syncative's palette and [`iced_fabi::Style`]), the file/folder [`iced_fabi::RowIcons`] (Tabler, or the vendored multicolour Material Icon Theme), the [`iced_fabi::Separators`] grid, the zebra stripe behind every second row, which entries are listed (all or folders only — file kinds are filtered code-side at init), how many entries the selection holds (many, one, or none), how the boxes appear (always, on long press, or hidden), and where the selection's action button sits (under the list, floating, or last in the toolbar), whether the browse/tree mode switch button is drawn at all ([`Cabinet::show_mode_toggle`](iced_fabi::Cabinet::show_mode_toggle), off by the bar's *Mode switch* dropdown); also what happens to toolbar tools that are not currently applicable (greyed out, or hidden outright). The toolbar itself shows the [`iced_fabi::Tool`] API: the built-in [`iced_fabi::BuiltInTool`] set (create folder, copy, paste) arrives with one `built_in_tools` call, the custom [`DuplicateHere`] is the demo's own `Tool` carrying a selection's subtree and sits among the custom tools, and the destructive delete joins last behind a [`iced_fabi::Cabinet::tool_separator`]; Delete (the built-in's own [`iced_fabi::Tool::confirmation`]) and Duplicate (the demo's) first ask in a confirmation modal, and the confirmed tool comes back as [`iced_fabi::Outcome::ToolConfirmed`]; a `Tools` dropdown switches any of them off ([`Browser::hide_tool`](iced_fabi::Browser::hide_tool)); selecting is done purely through the checkboxes. The column list gets one custom [`TypeColumn`], and a `Columns` dropdown switches which of the columns are drawn ([`Browser::hide_column`] / [`Browser::show_column`]; [`Browser::set_visible_columns`] is the same in one call at init).
+//! The bar above the cabinet demos the configuration hooks with dropdowns: the [`iced::Theme`] (including a reproduction of Syncative's palette and [`iced_fabi::Style`]), the file/folder [`iced_fabi::RowIcons`] (Tabler, or the vendored multicolour Material Icon Theme), the [`iced_fabi::Separators`] grid, the zebra stripe behind every second row, which entries are listed (all or folders only — file kinds are filtered code-side at init), how many entries the selection holds (many, one, or none), how the boxes appear (always, on long press, or hidden), and where the selection's action button sits (under the list, floating, last in the toolbar, or none at all — a cabinet needs no [`Cabinet::action`](iced_fabi::Cabinet::action) call), whether the browse/tree mode switch button is drawn at all ([`Cabinet::show_mode_toggle`](iced_fabi::Cabinet::show_mode_toggle), off by the bar's *Mode switch* dropdown); also what happens to toolbar tools that are not currently applicable (greyed out, or hidden outright). The toolbar itself shows the [`iced_fabi::Tool`] API: the built-in [`iced_fabi::BuiltInTool`] set (create folder, copy, paste) arrives with one `built_in_tools` call, the custom [`DuplicateHere`] is the demo's own `Tool` carrying a selection's subtree and sits among the custom tools, and the destructive delete joins last behind a [`iced_fabi::Cabinet::tool_separator`]; Delete (the built-in's own [`iced_fabi::Tool::confirmation`]) and Duplicate (the demo's) first ask in a confirmation modal, and the confirmed tool comes back as [`iced_fabi::Outcome::ToolConfirmed`]; a `Tools` dropdown switches any of them off ([`Browser::hide_tool`](iced_fabi::Browser::hide_tool)); selecting is done purely through the checkboxes. The column list gets one custom [`TypeColumn`], and a `Columns` dropdown switches which of the columns are drawn ([`Browser::hide_column`] / [`Browser::show_column`]; [`Browser::set_visible_columns`] is the same in one call at init).
 //!
 //! Run: `cargo run --example cloud_browse` — then switch modes with the icon in the top right, tap folders to drill down, tap the boxes to select (press and hold a row first when "Boxes" is on *on long press*), and watch the parent markers turn into dots.
 
@@ -645,17 +645,20 @@ impl App {
                 cabinet = cabinet.tool(BuiltInTool::Delete);
             }
         }
-        // The selection's action button: text and message are the app's, placement is picked in the bar.
+        // The selection's action button: text and message are the app's, placement is picked in the bar; "none" never calls `action`, and a cabinet without one draws no button.
         if show(has_selection) {
-            cabinet = cabinet.action(
-                iced_fabi::ActionButton::new("Delete selected", Message::Delete).placement(
-                    match self.action {
-                        ActionChoice::Wide => iced_fabi::ActionPlacement::WideCenter,
-                        ActionChoice::Floating => iced_fabi::ActionPlacement::Floating,
-                        ActionChoice::Toolbar => iced_fabi::ActionPlacement::ToolbarEnd,
-                    },
-                ),
-            );
+            let placement = match self.action {
+                ActionChoice::Wide => Some(iced_fabi::ActionPlacement::WideCenter),
+                ActionChoice::Floating => Some(iced_fabi::ActionPlacement::Floating),
+                ActionChoice::Toolbar => Some(iced_fabi::ActionPlacement::ToolbarEnd),
+                ActionChoice::None => None,
+            };
+            if let Some(placement) = placement {
+                cabinet = cabinet.action(
+                    iced_fabi::ActionButton::new("Delete selected", Message::Delete)
+                        .placement(placement),
+                );
+            }
         }
         if !syncative {
             return column![bar, cabinet].padding(16).spacing(8).into();
