@@ -7,7 +7,7 @@ Two views over one state:
 - **Browse** — one directory per screen with a breadcrumb bar (Android Documents-App style).
 - **Tree** — the whole tree in place, every branch expandable; selection can span levels.
 
-Every row carries a Material-style selection marker: an empty box, a tick once the item is selected as a unit, and a dot while only some of its content is selected. The column header repeats that box as a select-all for the whole list, and while anything is checked it reads "N selected" in place of the column titles. The row under the pointer lights up weaker than a selection; folder glyphs, header row and hover all take their own [`Style`] colours.
+Every row carries a Material-style selection marker: an empty box, a tick once the item is selected as a unit, and a dot while only some of its content is selected. The column header repeats that box as a select-all for the whole list (not under single selection, where there is no "all"), and while anything is checked it reads "N selected" in place of the column titles. The row under the pointer lights up weaker than a selection; folder glyphs, header row and hover all take their own [`Style`] colours.
 
 Listings are **supplied by the application** — local disk, rclone, an HTTP API: the widget reports which nodes need loading, the app answers with listings tagged to the node, and stale responses simply no-op.
 

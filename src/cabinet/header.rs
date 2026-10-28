@@ -19,9 +19,10 @@ where
         + iced_widget::core::Renderer
         + 'a,
 {
-    /// The select-all box and the sort headers — or, while something is selected, the selection count.
+    /// The select-all box and the sort headers — or, while something is selected, the selection count. Under [`Selection::Single`](crate::Selection::Single) the box cell stays empty: there is no "all" to select, and the open folder it would stand for is a picker's [fallback](crate::Browser::set_pick_open_folder) already.
     pub(super) fn column_header(&self) -> Element<'a, Message, Theme, Renderer> {
-        let marker = self.boxes_shown().then(|| {
+        let select_all = self.boxes_shown() && self.browser.selection() != crate::Selection::Single;
+        let marker = select_all.then(|| {
             self.marker_button(
                 self.browser.scope_marker(),
                 crate::Event::HeaderMarkerPressed,
