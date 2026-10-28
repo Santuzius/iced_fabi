@@ -14,6 +14,9 @@ const FILES: usize = 10_000;
 /// Folders per level of the tree fixture, and files in each of its lowest folders.
 const FAN_OUT: usize = 30;
 
+/// Folders nested in each other in the chain fixture.
+const CHAIN_DEPTH: usize = 1_000;
+
 /// Runs per measurement; the mean and the fastest run are printed.
 const RUNS: usize = 100;
 
@@ -62,6 +65,23 @@ fn deep_tree() -> (Browser, usize) {
         nodes += FAN_OUT;
     }
     (browser, nodes)
+}
+
+/// `depth` folders nested in each other, every branch open, with one file in the innermost one and that file ticked — the deep-directory shape, where each row's subtree reaches down to the bottom.
+fn deep_chain(depth: usize) -> Browser {
+    let mut browser = Browser::new("large");
+    browser.set_mode(Mode::Tree);
+    let mut parent = NodeId::ROOT;
+    for level in 0..depth {
+        let name = format!("level-{level:04}");
+        browser.set_children(parent, vec![Entry::folder(name.clone())]);
+        let id = NodeId::derive(parent, EntryKind::Folder, &name);
+        let _ = browser.activate(id);
+        parent = id;
+    }
+    browser.set_children(parent, vec![Entry::file("note.txt")]);
+    browser.toggle(NodeId::derive(parent, EntryKind::File, "note.txt"));
+    browser
 }
 
 /// `count` file entries named `<prefix>file-<n>.txt` with a varying size, so the size column has something to sort.
@@ -164,6 +184,17 @@ fn main() {
     by_size.sort_by_column(2);
     measure("build browse 10k by size", browse_rows, RUNS, || {
         build(&by_size);
+    });
+
+    let chain = deep_chain(CHAIN_DEPTH);
+    let chain_rows = listed_rows(&chain);
+    assert_eq!(
+        chain_rows,
+        CHAIN_DEPTH + 2,
+        "the chain fixture has every level open"
+    );
+    measure("build chain 1000 deep", chain_rows, RUNS, || {
+        build(&chain);
     });
 
     let (tree, nodes) = deep_tree();

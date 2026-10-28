@@ -224,6 +224,37 @@ impl Browser {
         }
     }
 
+    /// The marker `id` shows, given what the row walk already knows: `covered` says an ancestor of this row is selected (Material covers a whole subtree with one tick), and `partial` is the frame's set of nodes with something selected below them (see [`partial_marks`](Self::partial_marks)). Same answer as [`marker`](Self::marker), but neither the ancestor chain nor the subtree is walked per row.
+    pub(super) fn marker_with(
+        &self,
+        id: NodeId,
+        partial: &HashSet<NodeId>,
+        covered: bool,
+    ) -> Marker {
+        if covered || self.selected.contains(&id) {
+            Marker::Selected
+        } else if partial.contains(&id) {
+            Marker::Partial
+        } else {
+            Marker::Unselected
+        }
+    }
+
+    /// Every node with a selected node somewhere below it: the parents of the selected entries, collected once for a row list. Walking up stops at a node already in the set, so a shared chain is visited once; without this set, each row would walk its own whole loaded subtree.
+    pub(super) fn partial_marks(&self) -> HashSet<NodeId> {
+        let mut partial = HashSet::new();
+        for id in self.selected.iter() {
+            let mut parent = self.nodes.get(id).and_then(|node| node.parent);
+            while let Some(here) = parent {
+                if !partial.insert(here) {
+                    break;
+                }
+                parent = self.nodes.get(&here).and_then(|node| node.parent);
+            }
+        }
+        partial
+    }
+
     /// Whether anything at or below `id` (only loaded parts can be known) is explicitly selected.
     fn has_selected_below(&self, id: NodeId) -> bool {
         let Some(node) = self.nodes.get(&id) else {

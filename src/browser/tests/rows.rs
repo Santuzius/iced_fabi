@@ -1,5 +1,5 @@
 use crate::browser::{Browser, Entry, EntryKind, NodeId, rows::Row};
-use crate::{Cell, Column};
+use crate::{Cell, Column, Marker};
 use std::cmp::Ordering;
 
 #[test]
@@ -9,6 +9,58 @@ fn browse_rows_have_folders_first() {
     assert_eq!(rows.len(), 2);
     let first = browser.node(rows[0].id).unwrap();
     assert_eq!(first.kind, EntryKind::Folder);
+}
+
+#[test]
+fn rows_carry_their_selection_markers() {
+    let mut browser = Browser::sample();
+    let folder = NodeId::derive(NodeId::ROOT, EntryKind::Folder, "Finanzen");
+    let _ = browser.activate(folder);
+    browser.set_children(folder, vec![Entry::file("beleg.pdf")]);
+    let file = NodeId::derive(folder, EntryKind::File, "beleg.pdf");
+    browser.toggle(file);
+    assert_eq!(
+        markers(&browser, &browser.browse_rows()),
+        vec![("beleg.pdf", Marker::Selected)],
+        "inside the folder the ticked file is the only row"
+    );
+    let _ = browser.goto(NodeId::ROOT);
+    assert_eq!(
+        markers(&browser, &browser.browse_rows()),
+        vec![
+            ("Finanzen", Marker::Partial),
+            ("notes.txt", Marker::Unselected)
+        ],
+        "the folder carries the dot for what sits below it"
+    );
+    browser.set_mode(crate::Mode::Tree);
+    assert_eq!(
+        markers(&browser, &browser.tree_rows()),
+        vec![
+            ("My files", Marker::Partial),
+            ("Finanzen", Marker::Partial),
+            ("beleg.pdf", Marker::Selected),
+            ("notes.txt", Marker::Unselected),
+        ],
+        "the same rules reach the tree rows, which ask once per frame"
+    );
+    assert_eq!(
+        browser.marker(NodeId::ROOT),
+        Marker::Partial,
+        "and the single-query answer still agrees"
+    );
+}
+
+/// Each row's name with the marker it carries.
+fn markers<'a>(browser: &'a Browser, rows: &[Row]) -> Vec<(&'a str, Marker)> {
+    rows.iter()
+        .map(|row| {
+            (
+                browser.node(row.id).expect("listed node").name.as_str(),
+                row.marker,
+            )
+        })
+        .collect()
 }
 
 #[test]

@@ -1,6 +1,7 @@
 //! The row lists the widget draws: [`Row`] building for browse and tree mode, sorting, and the visibility settings that decide which entries appear at all.
 
 use std::cmp::Ordering;
+use std::collections::HashSet;
 
 use super::{Browser, Node, NodeId, node::EntryKind};
 use crate::browser::Mode;
@@ -86,6 +87,10 @@ impl Browser {
         let Some(current) = self.nodes.get(&self.current) else {
             return Vec::new();
         };
+        let partial = self.partial_marks();
+        // One question for the whole listing: is the scope itself, or one of its ancestors, a selected unit? That covers every row here.
+        let covered =
+            self.selected.contains(&self.current) || self.selected_ancestor(self.current).is_some();
         self.sorted(&current.children)
             .into_iter()
             .filter(|id| self.is_listed(*id))
@@ -94,7 +99,7 @@ impl Browser {
                 depth: 0,
                 expandable: false,
                 expanded: false,
-                marker: self.marker(id),
+                marker: self.marker_with(id, &partial, covered),
             })
             .collect()
     }
@@ -102,11 +107,20 @@ impl Browser {
     /// The rows for the tree view: every expanded branch from the root down, the root included.
     pub(crate) fn tree_rows(&self) -> Vec<Row> {
         let mut rows = Vec::new();
-        self.tree_rows_at(NodeId::ROOT, 0, &mut rows);
+        let partial = self.partial_marks();
+        self.tree_rows_at(NodeId::ROOT, 0, false, &partial, &mut rows);
         rows
     }
 
-    fn tree_rows_at(&self, id: NodeId, depth: usize, rows: &mut Vec<Row>) {
+    /// One row and, when the branch is open, its children. `covered` says an ancestor of this node is a selected unit; the walk passes it down once it steps below a selected node.
+    fn tree_rows_at(
+        &self,
+        id: NodeId,
+        depth: usize,
+        covered: bool,
+        partial: &HashSet<NodeId>,
+        rows: &mut Vec<Row>,
+    ) {
         let Some(node) = self.nodes.get(&id) else {
             return;
         };
@@ -119,12 +133,13 @@ impl Browser {
             depth,
             expandable: node.kind == EntryKind::Folder,
             expanded,
-            marker: self.marker(id),
+            marker: self.marker_with(id, partial, covered),
         });
         // A file has no children; an unlisted folder shows no child rows until loaded, but keeps its caret (see `expandable`).
         if expanded {
+            let below = covered || self.selected.contains(&id);
             for child in self.sorted(&node.children) {
-                self.tree_rows_at(child, depth + 1, rows);
+                self.tree_rows_at(child, depth + 1, below, partial, rows);
             }
         }
     }
