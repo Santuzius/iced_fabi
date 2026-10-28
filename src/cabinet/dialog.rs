@@ -96,7 +96,7 @@ where
             .align_y(Alignment::Center)
     }
 
-    /// The backdrop over the finished body with the card on top. The scrim doubles as the cancel hit-area — a click on it sends `cancel` — and `opaque` keeps the cabinet below from reacting at all, so a tool press behind an open modal cannot fire.
+    /// The backdrop over the finished body with the card on top. The scrim doubles as the cancel hit-area — a click on it sends `cancel` — and `opaque` keeps the cabinet below from reacting at all, so a tool press behind an open modal cannot fire. The scrim paints as a rounded rectangle in the cabinet's own corner radius ([`Style::radius`](crate::Style::radius)); an app that wraps the cabinet in a bordered card gives that card the same radius and no padding of its own, so the darkening follows the card's rounded corners while the click-to-dismiss hit-area stays the full rectangle.
     pub(super) fn dialog_layer(
         &self,
         card: Element<'a, Message, Theme, Renderer>,
@@ -116,6 +116,8 @@ where
                                     a: SCRIM,
                                     ..appearance.text
                                 })),
+                                text_color: Some(appearance.text),
+                                border: border::rounded(appearance.radius),
                                 ..container::Style::default()
                             }
                         }),

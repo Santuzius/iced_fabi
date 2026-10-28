@@ -642,7 +642,7 @@ impl App {
         if !syncative {
             return column![bar, cabinet].padding(16).spacing(8).into();
         }
-        // Syncative's page: the header bar over a hairline, the content on a card on the page background (paddings from `syncative/src/screens/remote_page.rs`).
+        // Syncative's page: the header bar over a hairline, the content on a card on the page background (paddings from `syncative/src/screens/remote_page.rs`). The card hugs the cabinet and takes its corner radius from the cabinet's own style, so the modal scrim's darkening covers the card to its rounded border.
         let header = container(bar)
             .padding(iced::Padding {
                 top: 18.0,
@@ -653,10 +653,9 @@ impl App {
             .width(Length::Fill)
             .style(syncative_header_bar);
         let card = container(cabinet.build())
-            .padding([4, 0])
             .width(Length::Fill)
             .height(Length::Fill)
-            .style(syncative_card);
+            .style(|theme| syncative_card(theme, syncative_style(theme).radius));
         container(column![
             header,
             iced::widget::rule::horizontal(1).style(syncative_separator),
