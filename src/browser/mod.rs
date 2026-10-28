@@ -6,9 +6,11 @@
 
 pub mod node;
 
+mod confirmation;
 mod loading;
 mod long_press;
 mod navigation;
+mod new_folder;
 pub(crate) mod rows;
 mod selection;
 #[cfg(test)]
@@ -37,6 +39,18 @@ pub enum Outcome {
     FileOpened(NodeId),
     /// The selection grew or shrank: re-evaluate anything keyed on it (an action button, a count line).
     SelectionChanged,
+    /// The user confirmed the new folder dialog: create a folder inside `parent` (`parent` was the open folder when the dialog opened). The name is already free of the siblings the browser has listed ([`open_new_folder_dialog`](Browser::open_new_folder_dialog)); the tree itself does not change until the app answers with the new [`set_children`](Browser::set_children) listing (reload `parent`).
+    CreateFolderRequested {
+        /// The folder the new folder goes into.
+        parent: NodeId,
+        /// The confirmed name, made free of `parent`'s listed siblings.
+        name: String,
+    },
+    /// The user confirmed a tool's [confirmation modal](crate::Tool::confirmation): run that tool's action now — its button press was held back and never messaged the app. `tool` names the tool by its [switch id](crate::ToolKey): the built-ins are `create-folder`, `copy`, `paste` and `delete`; custom tools by the id their [`Tool::id`](crate::Tool::id) returns.
+    ToolConfirmed {
+        /// The confirmed tool.
+        tool: crate::ToolKey,
+    },
 }
 
 /// The state of one file-browser screen: tree, navigation, columns, selection, sorting, mode.
@@ -76,6 +90,10 @@ pub struct Browser {
     pub(super) has_clipboard: bool,
     /// Ids of tools taken out of the toolbar ([`hide_tool`](Self::hide_tool)); a tool without an [`id`](crate::Tool::id) can never match one of these, so it always draws.
     pub(super) hidden_tools: HashSet<String>,
+    /// The new folder dialog: `Some` while it is open, holding the name drafted in its field ([`new_folder`](new_folder)).
+    pub(super) new_folder: Option<String>,
+    /// The tool confirmation modal: `Some` while it is open, holding the confirmed tool's key ([`confirmation`](confirmation)).
+    pub(super) pending_confirmation: Option<crate::ToolKey>,
 }
 
 /// One column of the listing and whether the cabinet draws it. The column and its visibility travel together so an index always means the same column; index 0 is the built-in Name column, whose `hidden` stays false.
@@ -123,6 +141,8 @@ impl std::fmt::Debug for Browser {
             )
             .field("has_clipboard", &self.has_clipboard)
             .field("hidden_tools", &self.hidden_tools)
+            .field("new_folder", &self.new_folder)
+            .field("pending_confirmation", &self.pending_confirmation)
             .finish()
     }
 }
@@ -167,6 +187,8 @@ impl Browser {
             ],
             has_clipboard: false,
             hidden_tools: HashSet::new(),
+            new_folder: None,
+            pending_confirmation: None,
         }
     }
 
@@ -212,6 +234,28 @@ impl Browser {
                     // Short press: the widget's press layer replaced the row button's events, so this is the row's only press.
                     self.tap(id)
                 }
+            }
+            Event::CreateFolderPressed => {
+                self.open_new_folder_dialog();
+                Outcome::None
+            }
+            Event::NewFolderNameEdited(name) => {
+                self.edit_new_folder_name(name);
+                Outcome::None
+            }
+            Event::NewFolderConfirmed => self.confirm_new_folder(),
+            Event::NewFolderCancelled => {
+                self.close_new_folder_dialog();
+                Outcome::None
+            }
+            Event::ToolConfirmationRequested { tool } => {
+                self.open_tool_confirmation(tool);
+                Outcome::None
+            }
+            Event::ToolConfirmationConfirmed => self.confirm_tool_confirmation(),
+            Event::ToolConfirmationCancelled => {
+                self.close_tool_confirmation();
+                Outcome::None
             }
         }
     }

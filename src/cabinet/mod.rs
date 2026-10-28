@@ -3,10 +3,13 @@
 //! This module owns the settings (one place to read them all) and the per-frame `build`; the rendering lives in the topic files — [`paint`](paint), [`toolbar`](toolbar), [`header`](header), [`list`](list), [`action`](action) — each adding its own `impl Cabinet` block.
 
 mod action;
+mod confirmation;
 mod cut;
+mod dialog;
 mod header;
 mod labels;
 mod list;
+mod new_folder;
 mod paint;
 mod toolbar;
 
@@ -88,7 +91,7 @@ pub struct Cabinet<'a, Message: Clone, Renderer> {
     pub(super) tools: Vec<ToolbarItem<'a, Message>>,
     pub(super) mode_toggle: bool,
     pub(super) action: Option<ActionButton<'a, Message>>,
-    pub(super) on_event: Box<dyn Fn(crate::Event) -> Message + 'a>,
+    pub(super) on_event: Rc<dyn Fn(crate::Event) -> Message + 'a>,
     pub(super) style: Rc<dyn Fn(&Theme) -> Style + 'a>,
     pub(super) icons: &'a dyn RowIcons,
     pub(super) separators: Separators,
@@ -109,7 +112,7 @@ where
 {
     Cabinet {
         browser,
-        on_event: Box::new(on_event),
+        on_event: Rc::new(on_event),
         tools: Vec::new(),
         mode_toggle: true,
         action: None,
@@ -268,7 +271,16 @@ where
                     .padding([8.0, paint::EDGE]),
             );
         }
-        body.into()
+        let body: Element<'a, Message, Theme, Renderer> = body.into();
+        // A modal covers the whole cabinet — toolbar included — while the browser holds one: the new folder dialog over its draft, the confirmation modal over a pending tool.
+        let modal = match self.browser.new_folder_draft() {
+            Some(draft) => Some(self.new_folder_dialog(draft)),
+            None => self.pending_confirmation_dialog(),
+        };
+        match modal {
+            Some(modal) => iced_widget::stack![body, modal].into(),
+            None => body,
+        }
     }
 }
 

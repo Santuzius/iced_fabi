@@ -292,3 +292,55 @@ fn selected_yields_in_tick_order_and_single_keeps_the_last() {
         );
     }
 }
+
+#[test]
+fn entry_counts_cover_listed_subtrees_and_count_each_entry_once() {
+    let mut browser = Browser::sample();
+    assert_eq!(
+        browser.selected_entry_counts(),
+        (0, 0),
+        "nothing selected removes nothing"
+    );
+
+    let finanzen = NodeId::derive(NodeId::ROOT, EntryKind::Folder, "Finanzen");
+    let notes = NodeId::derive(NodeId::ROOT, EntryKind::File, "notes.txt");
+    browser.toggle(finanzen);
+    browser.toggle(notes);
+    assert_eq!(
+        browser.selected_entry_counts(),
+        (1, 1),
+        "a folder never listed counts as the folder alone"
+    );
+
+    browser.set_children(
+        finanzen,
+        vec![Entry::file("beleg.pdf"), Entry::folder("2025")],
+    );
+    assert_eq!(
+        browser.selected_entry_counts(),
+        (2, 2),
+        "once listed, the selection covers the subtree"
+    );
+
+    let nested = NodeId::derive(finanzen, EntryKind::Folder, "2025");
+    let mut absorbed = Browser::sample();
+    absorbed.set_children(finanzen, vec![Entry::file("beleg.pdf"), Entry::folder("2025")]);
+    absorbed.set_children(nested, vec![Entry::file("quartal1.pdf")]);
+    absorbed.toggle(nested);
+    assert_eq!(
+        absorbed.selected_entry_counts(),
+        (1, 1),
+        "the nested folder alone covers its own listed subtree"
+    );
+    absorbed.toggle(finanzen);
+    assert_eq!(
+        absorbed.selected().collect::<Vec<_>>(),
+        vec![finanzen],
+        "selecting the parent absorbs the nested selection into one unit"
+    );
+    assert_eq!(
+        absorbed.selected_entry_counts(),
+        (2, 2),
+        "finanzen + 2025 as folders, beleg.pdf + quartal1.pdf as files, each once"
+    );
+}

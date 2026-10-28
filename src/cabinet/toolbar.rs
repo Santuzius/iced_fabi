@@ -95,7 +95,22 @@ where
                     };
                     let button = self.icon_button(tool.glyph(), 18.0, 30.0, field);
                     if enabled {
-                        button.on_press(tool.message(self.browser)).into()
+                        // A tool the cabinet answers itself routes its click through the browser instead of messaging the app; a tool that asks first sends its switch id to the confirmation modal — only an anonymous tool without one can be skipped through.
+                        let press = match tool.event_on_press() {
+                            Some(event) => (self.on_event)(event),
+                            None => {
+                                let asks = tool.confirmation(self.browser, &self.labels).is_some();
+                                match (asks, tool.id()) {
+                                    (true, Some(id)) => (self.on_event)(
+                                        crate::Event::ToolConfirmationRequested {
+                                            tool: crate::ToolKey::custom(id),
+                                        },
+                                    ),
+                                    _ => tool.message(self.browser),
+                                }
+                            }
+                        };
+                        button.on_press(press).into()
                     } else {
                         button.into()
                     }

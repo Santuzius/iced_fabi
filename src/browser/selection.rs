@@ -2,7 +2,7 @@
 
 use std::collections::HashSet;
 
-use super::{Browser, Checkboxes, NodeId, Selection};
+use super::{Browser, Checkboxes, EntryKind, NodeId, Selection};
 use crate::Marker;
 
 /// The explicit unit selections in selection order: `order` gives `iter` and `last` their tick order, `set` answers `contains` in constant time. The two are kept in step by the methods below and never touched directly; the field on [`Browser`] stays inside the `browser` module.
@@ -336,5 +336,29 @@ impl Browser {
             parent = self.nodes.get(&here).and_then(|node| node.parent);
         }
         None
+    }
+
+    /// What deleting the current selection would remove, as (folders, files): every selected entry itself plus everything listed beneath it. A selected folder the browser never listed counts as the folder alone — its contents are unknown — and a selection nested inside another selected entry is counted once, at its own root, never as part of the outer subtree too.
+    #[must_use]
+    pub fn selected_entry_counts(&self) -> (usize, usize) {
+        let (mut folders, mut files) = (0, 0);
+        let mut stack: Vec<NodeId> = self.selected.iter().copied().collect();
+        while let Some(id) = stack.pop() {
+            let Some(node) = self.nodes.get(&id) else {
+                continue;
+            };
+            if node.kind == EntryKind::Folder {
+                folders += 1;
+            } else {
+                files += 1;
+            }
+            stack.extend(
+                node.children
+                    .iter()
+                    .filter(|child| !self.selected.contains(child))
+                    .copied(),
+            );
+        }
+        (folders, files)
     }
 }

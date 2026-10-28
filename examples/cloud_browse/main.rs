@@ -1,6 +1,6 @@
 //! A cloud directory browser without the cloud: the listings come from a fake backend that answers every request one tick late, so the `activate → NeedsLoad → set_children` round-trip and its loading states behave like a real network drive.
 //!
-//! The bar above the cabinet demos the configuration hooks with dropdowns: the [`iced::Theme`] (including a reproduction of Syncative's palette and [`iced_fabi::Style`]), the file/folder [`iced_fabi::RowIcons`] (Tabler, or the vendored multicolour Material Icon Theme), the [`iced_fabi::Separators`] grid, the zebra stripe behind every second row, which entries are listed (all or folders only — file kinds are filtered code-side at init), how many entries the selection holds (many, one, or none), how the boxes appear (always, on long press, or hidden), and where the selection's action button sits (under the list, floating, or last in the toolbar), whether the browse/tree mode switch button is drawn at all ([`Cabinet::show_mode_toggle`](iced_fabi::Cabinet::show_mode_toggle), off by the bar's *Mode switch* dropdown); also what happens to toolbar tools that are not currently applicable (greyed out, or hidden outright). The toolbar itself shows the [`iced_fabi::Tool`] API: the built-in [`iced_fabi::BuiltInTool`] set (create folder, copy, paste) arrives with one `built_in_tools` call, the custom [`DuplicateHere`] is the demo's own `Tool` carrying a selection's subtree and sits among the custom tools, and the destructive delete joins last behind a [`iced_fabi::Cabinet::tool_separator`]; a `Tools` dropdown switches any of them off ([`Browser::hide_tool`](iced_fabi::Browser::hide_tool)); selecting is done purely through the checkboxes. The column list gets one custom [`TypeColumn`], and a `Columns` dropdown switches which of the columns are drawn ([`Browser::hide_column`] / [`Browser::show_column`]; [`Browser::set_visible_columns`] is the same in one call at init).
+//! The bar above the cabinet demos the configuration hooks with dropdowns: the [`iced::Theme`] (including a reproduction of Syncative's palette and [`iced_fabi::Style`]), the file/folder [`iced_fabi::RowIcons`] (Tabler, or the vendored multicolour Material Icon Theme), the [`iced_fabi::Separators`] grid, the zebra stripe behind every second row, which entries are listed (all or folders only — file kinds are filtered code-side at init), how many entries the selection holds (many, one, or none), how the boxes appear (always, on long press, or hidden), and where the selection's action button sits (under the list, floating, or last in the toolbar), whether the browse/tree mode switch button is drawn at all ([`Cabinet::show_mode_toggle`](iced_fabi::Cabinet::show_mode_toggle), off by the bar's *Mode switch* dropdown); also what happens to toolbar tools that are not currently applicable (greyed out, or hidden outright). The toolbar itself shows the [`iced_fabi::Tool`] API: the built-in [`iced_fabi::BuiltInTool`] set (create folder, copy, paste) arrives with one `built_in_tools` call, the custom [`DuplicateHere`] is the demo's own `Tool` carrying a selection's subtree and sits among the custom tools, and the destructive delete joins last behind a [`iced_fabi::Cabinet::tool_separator`]; Delete (the built-in's own [`iced_fabi::Tool::confirmation`]) and Duplicate (the demo's) first ask in a confirmation modal, and the confirmed tool comes back as [`iced_fabi::Outcome::ToolConfirmed`]; a `Tools` dropdown switches any of them off ([`Browser::hide_tool`](iced_fabi::Browser::hide_tool)); selecting is done purely through the checkboxes. The column list gets one custom [`TypeColumn`], and a `Columns` dropdown switches which of the columns are drawn ([`Browser::hide_column`] / [`Browser::show_column`]; [`Browser::set_visible_columns`] is the same in one call at init).
 //!
 //! Run: `cargo run --example cloud_browse` — then switch modes with the icon in the top right, tap folders to drill down, tap the boxes to select (press and hold a row first when "Boxes" is on *on long press*), and watch the parent markers turn into dots.
 
@@ -288,16 +288,8 @@ impl App {
                 Task::none()
             }
             Message::CreateFolder => {
-                // The built-in Create folder tool: the new folder goes into the fake cloud under the open one; a real backend would get the create call instead.
-                let key = self
-                    .browser
-                    .path_below_root(self.browser.current())
-                    .join("/");
-                let mut listing = self.cloud.get(&key).cloned().unwrap_or_default();
-                let name = unique_folder_name(&listing);
-                listing.push(Entry::folder(name).modified(now_epoch()));
-                self.cloud.insert(key.clone(), listing.clone());
-                self.browser.set_children(self.browser.current(), listing);
+                // This message now only comes from the demo's own shortcut paths: the built-in toolbar button opens the dialog itself. The dialog asks the name; the confirmed one arrives as `Outcome::CreateFolderRequested`.
+                self.browser.open_new_folder_dialog();
                 Task::none()
             }
             Message::Copy => {
@@ -314,25 +306,14 @@ impl App {
                 Task::none()
             }
             Message::Duplicate => {
-                // The demo's custom tool: copy and paste in one step — the selection lands back beside itself under a copy name.
-                let copies = self.snapshot_selection();
-                self.put_copies(copies);
-                self.browser.clear_selection();
+                // The toolbar no longer emits this: Duplicate asks first and the confirmed click comes back as `Outcome::ToolConfirmed`.
+                self.duplicate_selection();
                 Task::none()
             }
             Message::Delete => {
-                // Drop the selected entries from the fake cloud (with their subtrees) and from the browser; a real backend would get the delete call instead.
-                for id in self.browser.selected().collect::<Vec<_>>() {
-                    let path = self.browser.path_below_root(id).join("/");
-                    delete_paths(&mut self.cloud, &path);
-                }
-                self.browser.remove_selected();
-                let key = self
-                    .browser
-                    .path_below_root(self.browser.current())
-                    .join("/");
-                let listing = self.cloud.get(&key).cloned().unwrap_or_default();
-                self.browser.set_children(self.browser.current(), listing);
+                // Both delete affordances — the toolbar's Delete (the built-in asks on its own) and this action button — go through the confirmation modal first; the work happens when `Outcome::ToolConfirmed` arrives.
+                self.browser
+                    .open_tool_confirmation(BuiltInTool::Delete.into());
                 Task::none()
             }
             Message::Theme(choice) => {
@@ -393,8 +374,44 @@ impl App {
                 self.browser.toggle(id);
             }
             Outcome::SelectionChanged | Outcome::None => {}
+            Outcome::CreateFolderRequested { parent, name } => {
+                // The new folder goes into the fake cloud under `parent`; a real backend would get the create call instead. The browser already made `name` free of the siblings it has listed.
+                let key = self.browser.path_below_root(parent).join("/");
+                let mut listing = self.cloud.get(&key).cloned().unwrap_or_default();
+                listing.push(Entry::folder(name).modified(now_epoch()));
+                self.cloud.insert(key.clone(), listing.clone());
+                self.browser.set_children(parent, listing);
+            }
+            Outcome::ToolConfirmed { tool } => match tool.id() {
+                // A confirmed tool's action: its button press never messaged the app, so the held-back work runs here, named by the tool's switch id.
+                "delete" => self.delete_selected(),
+                DuplicateHere::ID => self.duplicate_selection(),
+                _ => {}
+            },
         }
         Message::Tick
+    }
+
+    /// Drop the selected entries from the fake cloud (with their subtrees) and from the browser; a real backend would get the delete call instead.
+    fn delete_selected(&mut self) {
+        for id in self.browser.selected().collect::<Vec<_>>() {
+            let path = self.browser.path_below_root(id).join("/");
+            delete_paths(&mut self.cloud, &path);
+        }
+        self.browser.remove_selected();
+        let key = self
+            .browser
+            .path_below_root(self.browser.current())
+            .join("/");
+        let listing = self.cloud.get(&key).cloned().unwrap_or_default();
+        self.browser.set_children(self.browser.current(), listing);
+    }
+
+    /// The demo's custom tool's work: copy and paste in one step — the selection lands back beside itself under a copy name.
+    fn duplicate_selection(&mut self) {
+        let copies = self.snapshot_selection();
+        self.put_copies(copies);
+        self.browser.clear_selection();
     }
 
     fn subscription(&self) -> iced::Subscription<Message> {
@@ -450,7 +467,10 @@ impl App {
                 list.into()
             }
         }
-        fn columns_list<'a>(options: &'a [ColumnOption], syncative: bool) -> Element<'a, Message> {
+        fn columns_list<'a>(
+            options: &'a [ColumnOption],
+            syncative: bool,
+        ) -> Element<'a, Message> {
             let list = iced::widget::pick_list(options, None::<&ColumnOption>, |option| {
                 Message::ColumnToggle(option.key.clone())
             })
@@ -465,7 +485,10 @@ impl App {
                 list.into()
             }
         }
-        fn tools_list<'a>(options: &'a [ToolOption], syncative: bool) -> Element<'a, Message> {
+        fn tools_list<'a>(
+            options: &'a [ToolOption],
+            syncative: bool,
+        ) -> Element<'a, Message> {
             let list = iced::widget::pick_list(options, None::<&ToolOption>, |option| {
                 Message::ToolToggle(option.key.clone())
             })
@@ -685,7 +708,7 @@ impl fmt::Display for ToolOption {
     }
 }
 
-/// The demo's own toolbar tool — the bar-side counterpart of the custom column: the [`iced_fabi::Tool`] implementation supplies glyph, switch id, applicability and message; the id is what [`Browser::hide_tool`](iced_fabi::Browser::hide_tool) and the Tools dropdown match on. What the click does (copy and paste in one step) is entirely the demo's.
+/// The demo's own toolbar tool — the bar-side counterpart of the custom column: the [`iced_fabi::Tool`] implementation supplies glyph, switch id, applicability, message and a [confirmation modal](iced_fabi::Tool::confirmation); the id is what [`Browser::hide_tool`](iced_fabi::Browser::hide_tool) and the Tools dropdown match on, and what the confirmed modal comes back as. What the click does (copy and paste in one step) is entirely the demo's.
 struct DuplicateHere;
 
 impl DuplicateHere {
@@ -708,6 +731,18 @@ impl Tool<Message> for DuplicateHere {
 
     fn message(&self, _browser: &Browser) -> Message {
         Message::Duplicate
+    }
+
+    fn confirmation(&self, browser: &Browser, _labels: &iced_fabi::Labels) -> Option<iced_fabi::ToolConfirmation> {
+        // A custom modal, the demo's own words: the cabinet asks again each frame, so the count tracks the live selection. The confirm button names the act.
+        Some(iced_fabi::ToolConfirmation {
+            title: "Duplicate here?".into(),
+            body: Some(format!(
+                "Copy the {} selected entries into this folder.",
+                browser.selected().count()
+            )),
+            confirm: "Duplicate".into(),
+        })
     }
 }
 
@@ -816,18 +851,6 @@ fn delete_paths(cloud: &mut HashMap<String, Vec<Entry>>, path: &str) {
             }
         }
     }
-}
-
-/// `report.pdf` → `report copy.pdf`, `report copy.pdf` → `report copy 2.pdf`, …
-/// The name for a folder the Create folder tool adds: `New folder`, then `New folder 2`, … until it is free in `listing`.
-fn unique_folder_name(listing: &[Entry]) -> String {
-    let mut candidate = "New folder".to_string();
-    let mut counter = 2;
-    while listing.iter().any(|entry| entry.name == candidate) {
-        candidate = format!("New folder {counter}");
-        counter += 1;
-    }
-    candidate
 }
 
 /// Seconds since the Unix epoch, for the `modified` stamp of entries the app creates.

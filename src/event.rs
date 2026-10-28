@@ -1,6 +1,7 @@
 //! What the cabinet widget reports back to the application. Apps hand each [`Event`] straight to [`Browser::update`]; they never construct or match on them, so the enum is `#[non_exhaustive]` and the variants are named after what the user *did*, not after the state method that happens to apply it.
 
 use crate::browser::node::NodeId;
+use crate::ToolKey;
 
 /// One interaction inside the widget. Route it with [`update`](crate::Browser::update).
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -26,6 +27,23 @@ pub enum Event {
     HoldStarted(NodeId),
     /// A row's press ended — see [`hold_ended`](crate::Browser::hold_ended): held long enough it reveals the boxes and ticks the row, otherwise it is that row's normal press.
     HoldEnded(NodeId),
+    /// The built-in Create folder button was pressed: the cabinet opens its new folder dialog instead of messaging the app.
+    CreateFolderPressed,
+    /// A name was typed into the new folder dialog's field.
+    NewFolderNameEdited(String),
+    /// The new folder dialog was confirmed (its button, or Enter in the field).
+    NewFolderConfirmed,
+    /// The new folder dialog was dismissed (Cancel, or a click on the darkened background).
+    NewFolderCancelled,
+    /// A tool that [asks first](crate::Tool::confirmation) was pressed: the cabinet opens its confirmation modal.
+    ToolConfirmationRequested {
+        /// The pressed tool, by its switch id.
+        tool: ToolKey,
+    },
+    /// A tool confirmation modal was confirmed (its button, or Enter): the browser closes it and hands the tool back to the app as [`ToolConfirmed`](crate::Outcome::ToolConfirmed).
+    ToolConfirmationConfirmed,
+    /// A tool confirmation modal was dismissed (Cancel, or a click on the darkened background): nothing runs.
+    ToolConfirmationCancelled,
 }
 
 impl Event {
@@ -39,7 +57,16 @@ impl Event {
             | Event::CrumbPressed(id)
             | Event::HoldStarted(id)
             | Event::HoldEnded(id) => Some(*id),
-            Event::HeaderMarkerPressed | Event::SortPressed(_) | Event::ModeSwitchPressed => None,
+            Event::HeaderMarkerPressed
+            | Event::SortPressed(_)
+            | Event::ModeSwitchPressed
+            | Event::CreateFolderPressed
+            | Event::NewFolderNameEdited(_)
+            | Event::NewFolderConfirmed
+            | Event::NewFolderCancelled
+            | Event::ToolConfirmationRequested { .. }
+            | Event::ToolConfirmationConfirmed
+            | Event::ToolConfirmationCancelled => None,
         }
     }
 }

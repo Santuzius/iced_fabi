@@ -21,6 +21,8 @@ Item centres, measured from the pixels and hit 6 of 6 times in one try each (ope
 - Theme: opens at `(155, 73)`; Default light `(110, 100)`, Default dark `(110, 128)`, Syncative light `(110, 156)`, Syncative dark `(110, 184)`
 - Zebra: opens at `(115, 106)` in every theme; off `(115, 136)`, subtle `(115, 165)`, strong `(115, 193)` — Syncative items are 28 px tall, the Default themes' about 31 px
 - List checkboxes at `x = 49`, rows 37 px apart: header (selects all) `y = 219`, Dokumente `256`, Finanzen `293`, Projekte `330`, readme.md `367`; the topmost checkbox band in a column scan is the header's, not the first row's
+- Toolbar icons at `y ≈ 178`: Create folder `1109`, Copy `1141`, Paste `1173`, Duplicate `1205`, Delete `1252`
+- Confirmation/new-folder modal card spans `x 500–799` with its accent confirm button centred at `(750, 483)` for three-line cards (title, body, buttons; scan the accent band on `y=474` to re-measure after any card change)
 
 For a target that is not listed, take the shot with `GRID=50` and no steps, then measure its colour bands with `SCAN=300` (or `agent-screenshot --scan temp/shot.png 300` on a shot taken without `GRID`): each band's `y` range and RGB down column 300, `SCAN=y=178` for a row.
 

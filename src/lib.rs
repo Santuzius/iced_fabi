@@ -20,7 +20,7 @@
 //!
 //! [`Cabinet`] is rebuilt on every draw from [`cabinet`] and carries the look of that one draw: the selection settings ([`crate::Selection`] and [`crate::Checkboxes`]) on the [`Browser`], the toolbar [`tool`](Cabinet::tool)s and the built-in [`BuiltInTool`] set ([`built_in_tools`](Cabinet::built_in_tools), [`Browser::hide_tool`] / [`Browser::show_tool`] switch named ones out and [`Browser::set_visible_tools`] sets the whole list at once), the [`action`](Cabinet::action) button ([`ActionButton`]), [`separators`](Cabinet::separators), [`style`](Cabinet::style), [`icons`](Cabinet::icons), [`text_size`](Cabinet::text_size), [`font`](Cabinet::font) and [`scrollbar`](Cabinet::scrollbar).
 //!
-//! The widget talks to the app in two directions only: it emits [`Event`]s — hand each one to [`Browser::update`] in your `update`, and the returned [`Outcome`] says what to do next (fetch, open, or nothing) — and it receives listings via [`set_children`](Browser::set_children). Start-up: after configuring the browser, call [`open`](Browser::open) and act on its [`Outcome::NeedsLoad`] before the first draw.
+//! The widget talks to the app in two directions only: it emits [`Event`]s — hand each one to [`Browser::update`] in your `update`, and the returned [`Outcome`] says what to do next (fetch, open, create, run a confirmed tool, or nothing) — and it receives listings via [`set_children`](Browser::set_children). Start-up: after configuring the browser, call [`open`](Browser::open) and act on its [`Outcome::NeedsLoad`] before the first draw.
 //!
 //! # The whole integration, three steps
 //!
@@ -56,7 +56,12 @@
 //!         match message {
 //!             Message::Cabinet(event) => match self.browser.update(event) {
 //!                 Outcome::NeedsLoad(id) => Task::done(Message::Listed(id, Vec::new())), // fetch
-//!                 Outcome::FileOpened(_) | Outcome::SelectionChanged | Outcome::None => Task::none(),
+//!                 // A real app would open the file and create the folder it is asked for here.
+//!                 Outcome::FileOpened(_)
+//!                 | Outcome::CreateFolderRequested { .. }
+//!                 | Outcome::ToolConfirmed { .. }
+//!                 | Outcome::SelectionChanged
+//!                 | Outcome::None => Task::none(),
 //!             },
 //!             Message::Listed(id, entries) => {
 //!                 self.browser.set_children(id, entries);
@@ -100,4 +105,4 @@ pub use event::Event;
 pub use format::{format_bytes, format_epoch};
 pub use icon::{RowIcons, TablerIcons};
 pub use style::Style;
-pub use tool::{BuiltInTool, SimpleTool, Tool, ToolKey, tool};
+pub use tool::{BuiltInTool, SimpleTool, Tool, ToolConfirmation, ToolKey, tool};
