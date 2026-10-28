@@ -1,6 +1,6 @@
 # The Material Icon Theme cut (examples/assets/material-icon-theme/)
 
-- Content: 29 unmodified SVGs (26 language/format icons + the three defaults file/folder/folder-open) + LICENSE; the `cloud_browse` example maps ~30 extensions to them in its `MATERIAL_ICONS` block.
+- Content: 29 unmodified SVGs (26 language/format icons + the three defaults file/folder/folder-open) + LICENSE; the `cloud_browse` example maps ~30 extensions to them in [`examples/cloud_browse/icons.rs`](../examples/cloud_browse/icons.rs).
 - Source: Material Icon Theme v5.39.0, fetched 2026-10-25, each file byte-compared (`cmp`) against the artifact. 26 come from `icons/` at tag `v5.39.0` of <https://github.com/material-extensions/vscode-material-icon-theme>; `file.svg`, `folder.svg`, `folder-open.svg` come from the npm package `material-icon-theme@5.39.0` — the git tree's `icons/` does not carry those three (the theme generates them at package build time; Iconify serves them as "hidden" icons of the same collection).
 - The demo's extension mapping follows the theme's own table (`dist/material-icons.json` in the npm package, key `fileExtensions`): `xls`/`xlsx` → `table` (there is no `excel.svg`), `txt` → `document`, `sh` → `console`, `7z`/`rar` → `zip`.
 - Binary size: whole cut ~16 KB on disk, embedded only in the example via `include_str!`; the library itself carries no Material icons (its status glyphs are Tabler, a crates.io dependency of `icondata`, nothing vendored).
