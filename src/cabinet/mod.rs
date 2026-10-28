@@ -156,15 +156,14 @@ where
         self
     }
 
-    /// Add the built-in set — [`BuiltInTool::Copy`] and [`BuiltInTool::Paste`], a divider, then [`BuiltInTool::Delete`] — the set most file lists start from. Each button enables itself from browser state (selection, [`has_clipboard`](crate::Browser::has_clipboard)), and every one of them is switchable through [`Browser::hide_tool`](crate::Browser::hide_tool); your own [`tool`](Self::tool)s go after. The message type names the built-ins through `impl From<BuiltInTool> for Message`.
+    /// Add the built-in set — [`BuiltInTool::CreateFolder`], [`BuiltInTool::Copy`] and [`BuiltInTool::Paste`] — the set most file lists start from. Each button enables itself from browser state (selection, [`has_clipboard`](crate::Browser::has_clipboard)), and every one of them is switchable through [`Browser::hide_tool`](crate::Browser::hide_tool); your own [`tool`](Self::tool)s go after. A destructive [`BuiltInTool::Delete`] reads better behind a [`tool_separator`](Self::tool_separator) of its own: `cabinet.built_in_tools().tool(my_tool).tool_separator().tool(BuiltInTool::Delete)`. The message type names the built-ins through `impl From<BuiltInTool> for Message`.
     pub fn built_in_tools(self) -> Self
     where
         Message: From<BuiltInTool>,
     {
-        self.tool(BuiltInTool::Copy)
+        self.tool(BuiltInTool::CreateFolder)
+            .tool(BuiltInTool::Copy)
             .tool(BuiltInTool::Paste)
-            .tool_separator()
-            .tool(BuiltInTool::Delete)
     }
 
     /// Show or hide the built-in browse/tree switch button; it sits by the breadcrumbs, a divider from the tools. Default: on.

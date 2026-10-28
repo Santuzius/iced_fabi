@@ -1,6 +1,6 @@
 //! A cloud directory browser without the cloud: the listings come from a fake backend that answers every request one tick late, so the `activate → NeedsLoad → set_children` round-trip and its loading states behave like a real network drive.
 //!
-//! The bar above the cabinet demos the configuration hooks with dropdowns: the [`iced::Theme`] (including a reproduction of Syncative's palette and [`iced_fabi::Style`]), the file/folder [`iced_fabi::RowIcons`] (Tabler, or the vendored multicolour Material Icon Theme), the [`iced_fabi::Separators`] grid, the zebra stripe behind every second row, which entries are listed (all or folders only — file kinds are filtered code-side at init), how many entries the selection holds (many, one, or none), how the boxes appear (always, on long press, or hidden), and where the selection's action button sits (under the list, floating, or last in the toolbar); also what happens to toolbar tools that are not currently applicable (greyed out, or hidden outright). The toolbar itself shows the [`iced_fabi::Tool`] API: the built-in [`iced_fabi::BuiltInTool`] set (copy, paste, delete in two groups divided by [`iced_fabi::Cabinet::tool_separator`]) arrives with one `built_in_tools` call, the custom [`DuplicateHere`] is the demo's own `Tool` carrying a selection's subtree, and a `Tools` dropdown switches any of them off ([`Browser::hide_tool`](iced_fabi::Browser::hide_tool)); selecting is done purely through the checkboxes.checkboxes. The column list gets one custom [`TypeColumn`], and a `Columns` dropdown switches which of the columns are drawn ([`Browser::hide_column`] / [`Browser::show_column`]; [`Browser::set_visible_columns`] is the same in one call at init).
+//! The bar above the cabinet demos the configuration hooks with dropdowns: the [`iced::Theme`] (including a reproduction of Syncative's palette and [`iced_fabi::Style`]), the file/folder [`iced_fabi::RowIcons`] (Tabler, or the vendored multicolour Material Icon Theme), the [`iced_fabi::Separators`] grid, the zebra stripe behind every second row, which entries are listed (all or folders only — file kinds are filtered code-side at init), how many entries the selection holds (many, one, or none), how the boxes appear (always, on long press, or hidden), and where the selection's action button sits (under the list, floating, or last in the toolbar); also what happens to toolbar tools that are not currently applicable (greyed out, or hidden outright). The toolbar itself shows the [`iced_fabi::Tool`] API: the built-in [`iced_fabi::BuiltInTool`] set (create folder, copy, paste) arrives with one `built_in_tools` call, the custom [`DuplicateHere`] is the demo's own `Tool` carrying a selection's subtree and sits among the custom tools, and the destructive delete joins last behind a [`iced_fabi::Cabinet::tool_separator`]; a `Tools` dropdown switches any of them off ([`Browser::hide_tool`](iced_fabi::Browser::hide_tool)); selecting is done purely through the checkboxes. The column list gets one custom [`TypeColumn`], and a `Columns` dropdown switches which of the columns are drawn ([`Browser::hide_column`] / [`Browser::show_column`]; [`Browser::set_visible_columns`] is the same in one call at init).
 //!
 //! Run: `cargo run --example cloud_browse` — then switch modes with the icon in the top right, tap folders to drill down, tap the boxes to select (press and hold a row first when "Boxes" is on *on long press*), and watch the parent markers turn into dots.
 
@@ -564,23 +564,28 @@ impl App {
                 .text_size(SYNCATIVE_TEXT)
                 .scrollbar(syncative_scroll_direction(), syncative_scrollbar);
         }
-        // The library's built-in set — Copy, Paste, a divider, Delete — in one call; each button greys itself from browser state (selection, the clipboard flag), and the Tools dropdown switches any of them off entirely. The demo's own `DuplicateHere` joins the second group; with "hidden" inactive tools the app leaves out what does not apply instead, and since the built-ins are plain values that works one by one — the cabinet drops the stray dividers itself.
+        // The library's built-in set — Create folder, Copy, Paste — in one call, then the demo's own `DuplicateHere` among the custom tools, then a divider and the destructive Delete as its own group; each button greys itself from browser state (selection, the clipboard flag; Create folder always applies), and the Tools dropdown switches any of them off entirely. With "hidden" inactive tools the app leaves out what does not apply instead, and since the built-ins are plain values that works one by one — the cabinet drops the stray dividers itself.
         if self.inactive == InactiveChoice::GreyedOut {
-            cabinet = cabinet.built_in_tools();
+            cabinet = cabinet
+                .built_in_tools()
+                .tool(DuplicateHere)
+                .tool_separator()
+                .tool(BuiltInTool::Delete);
         } else {
+            cabinet = cabinet.tool(BuiltInTool::CreateFolder);
             if show(has_selection) {
                 cabinet = cabinet.tool(BuiltInTool::Copy);
             }
             if show(has_clipboard) {
                 cabinet = cabinet.tool(BuiltInTool::Paste);
             }
+            if show(has_selection) {
+                cabinet = cabinet.tool(DuplicateHere);
+            }
             cabinet = cabinet.tool_separator();
             if show(has_selection) {
                 cabinet = cabinet.tool(BuiltInTool::Delete);
             }
-        }
-        if show(has_selection) {
-            cabinet = cabinet.tool(DuplicateHere);
         }
         // The selection's action button: text and message are the app's, placement is picked in the bar.
         if show(has_selection) {

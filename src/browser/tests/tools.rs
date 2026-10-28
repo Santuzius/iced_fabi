@@ -26,6 +26,10 @@ fn the_clipboard_flag_answers_the_app() {
 fn the_built_ins_enable_from_browser_state() {
     let browser = Browser::sample();
     assert!(
+        <BuiltInTool as Tool<Msg>>::enabled(&BuiltInTool::CreateFolder, &browser),
+        "an open folder is enough to create in"
+    );
+    assert!(
         !<BuiltInTool as Tool<Msg>>::enabled(&BuiltInTool::Copy, &browser),
         "nothing selected yet"
     );
