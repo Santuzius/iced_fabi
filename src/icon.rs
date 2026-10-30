@@ -24,7 +24,7 @@ fn handle(glyph: icondata::Icon) -> core_svg::Handle {
     })
 }
 
-/// Wrap a glyph's inner path data in a complete `<svg>` document, respecting its paint metadata: Tabler outline icons declare `fill="none"` with a 2-px round stroke, while glyphs that carry no metadata at all (IcoMoon) are solid silhouettes with the detail cut out by the fill rule, so they default to `fill="currentColor"` with `fill-rule="evenodd"` — a bare path with neither fill nor stroke would be invisible otherwise.
+/// Wrap a glyph's inner path data in a complete `<svg>` document, respecting its paint metadata: Tabler outline icons declare `fill="none"` with a 2-px round stroke, while glyphs that carry no metadata at all (Boxicons) are solid silhouettes with the detail cut out by the fill rule, so they default to `fill="currentColor"` with `fill-rule="evenodd"` — a bare path with neither fill nor stroke would be invisible otherwise.
 fn svg_document(glyph: icondata::Icon) -> String {
     let view_box = glyph.view_box.unwrap_or("0 0 24 24");
     let (fill, fill_rule) = match (glyph.fill, glyph.stroke) {
@@ -73,35 +73,21 @@ where
         .style(|_, _| Style { color: None })
 }
 
-// --- glyphs used by the widget: the three selection boxes from IcoMoon Free (https://github.com/Keyamoon/IcoMoon-Free; artwork GPL-3.0-or-later © Keyamoon, even though the `icondata_im` crate metadata says MIT — flag this to any licensee), everything else Tabler (MIT, © 1000+ contributors, https://tabler.io/icons) unless custom ---
+// --- glyphs used by the widget: the three selection boxes from Boxicons (MIT, © Aniket Suvarna, https://boxicons.com), everything else Tabler (MIT, © 1000+ contributors, https://tabler.io/icons) unless custom ---
 
-/// Unticked box: IcoMoon's unchecked checkbox (filled square with an evenodd-cut interior, so it reads as an outline but is one solid shape).
-pub const SQUARE_OUTLINE: icondata::Icon = icondata::ImCheckboxUnchecked;
+/// A Boxicons checkbox with its viewBox cropped to a 1-unit margin around the square (5–19 of 24), so the box fills most of the glyph instead of 14/24 of it.
+const fn boxed(icon: icondata::Icon) -> icondata_core::IconData {
+    icondata_core::IconData { view_box: Some("4 4 16 16"), ..*icon }
+}
 
-/// Ticked box: IcoMoon's checked checkbox (filled square with the checkmark cut out).
-pub const CHECKBOX: icondata::Icon = icondata::ImCheckboxChecked;
+/// Unticked box: Boxicons' regular checkbox, an outlined square.
+pub const SQUARE_OUTLINE: icondata::Icon = &boxed(icondata::BiCheckboxRegular);
 
-/// The partial marker: IcoMoon's checkbox box with its checkmark cut replaced by a rounded horizontal bar — Material's indeterminate state. IcoMoon Free ships no indeterminate glyph, so the box is `ImCheckboxChecked`'s outer subpath verbatim (byte-identical to `ImCheckboxUnchecked`'s) and only the cut changes: a Material-style bar of 10/24 of the box width and 2/24 thickness scaled into the 16 viewBox, with 0.75 round ends. Both subpaths sit in one `<path>`, so the document-level `fill-rule="evenodd"` (see `svg_document`) punches the bar out of the filled box exactly as the checkmark is cut — the glyph reads as a checked box in the accent colour with a dash instead of a tick.
-pub const SQUARE_DOT: icondata::Icon = &icondata_core::IconData {
-    style: None,
-    x: None,
-    y: None,
-    width: Some("16"),
-    height: Some("16"),
-    view_box: Some("0 0 16 16"),
-    stroke_linecap: None,
-    stroke_linejoin: None,
-    stroke_width: None,
-    stroke: None,
-    fill: None,
-    data: concat!(
-        // SVG path data derived from IcoMoon Free (GPL-3.0-or-later, © Keyamoon) https://github.com/Keyamoon/IcoMoon-Free
-        // Box, copied verbatim from ImCheckboxChecked (first subpath).
-        r#"<path d="M14 0h-12c-1.1 0-2 0.9-2 2v12c0 1.1 0.9 2 2 2h12c1.1 0 2-0.9 2-2v-12c0-1.1-0.9-2-2-2z"#,
-        // Indeterminate bar cut: 6.7×1.5 centred at (8,8), radius-0.75 round ends.
-        r#"M5.4 7.25h5.2a.75.75 0 0 1 0 1.5h-5.2a.75.75 0 0 1 0-1.5z" />"#,
-    ),
-};
+/// Ticked box: Boxicons' solid checked checkbox (filled square with the checkmark cut out).
+pub const CHECKBOX: icondata::Icon = &boxed(icondata::BiCheckboxCheckedSolid);
+
+/// The partial marker: Boxicons' solid minus checkbox (filled square with a bar cut out), Material's indeterminate state.
+pub const SQUARE_MINUS: icondata::Icon = &boxed(icondata::BiCheckboxMinusSolid);
 pub const CHEVRON_RIGHT: icondata::Icon = icondata::TbChevronRightOutline;
 pub const CHEVRON_DOWN: icondata::Icon = icondata::TbChevronDownOutline;
 pub const FOLDER: icondata::Icon = icondata::TbFolderFilled;

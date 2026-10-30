@@ -117,7 +117,7 @@ where
         let (glyph, field) = match marker {
             Marker::Unselected => (crate::icon::SQUARE_OUTLINE, ColourField::Muted),
             Marker::Selected => (crate::icon::CHECKBOX, ColourField::Accent),
-            Marker::Partial => (crate::icon::SQUARE_DOT, ColourField::Accent),
+            Marker::Partial => (crate::icon::SQUARE_MINUS, ColourField::Accent),
         };
         self.icon_button(glyph, 20.0, 28.0, field)
             .on_press((self.on_event)(event))

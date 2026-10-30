@@ -6,5 +6,3 @@ This program is free software: you can redistribute it and/or modify it under th
 This program incorporates third-party artwork:
 
   * assets/material-icon-theme/: SVG icons from the Material Icon Theme for VS Code (MIT, © 2025 Material Extensions, https://github.com/material-extensions/vscode-material-icon-theme), taken unmodified from release v5.39.0 — most from its icons/ at that tag, the three default glyphs (file, folder, folder-open) from the same release's npm package; the license text is assets/material-icon-theme/LICENSE.
-
-  * src/icon.rs embeds three glyph paths from IcoMoon Free (GPL-3.0-or-later, © Keyamoon, https://github.com/Keyamoon/IcoMoon-Free — the free set is GPL-only, a commercial licence is sold by Keyamoon): the checkbox glyphs `checkbox-checked` and `checkbox-unchecked` verbatim and a third marker stitched from their outer path, all arriving via the `icondata_im` crate whose own code is MIT but whose data is this artwork. The crate code stays MIT; downstream licensees of a binary linking it should weigh the embedded GPL paths or swap the three glyphs.

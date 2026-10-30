@@ -17,9 +17,9 @@ material-icon-theme = []
 [dependencies]
 # Only the widgets, so the crate brings no renderer, window system or executor of its own. Apps on an iced fork patch `iced_widget` with the fork's (their `[patch.crates-io]`), so Cargo builds a single copy of iced. The icons are SVG documents, hence the `svg` feature.
 iced_widget = { version = "0.14", features = ["svg"] }
-# Status glyphs (markers, carets, file kinds, sort arrows) from one pack; syncative uses the same crate and pack, so the glyphs match its UI. The `ico-moon-free` feature adds only the two checkbox glyphs (the third marker is stitched from their path data); the crate metadata says MIT, but Keyamoon's IcoMoon Free artwork is GPL-3.0-or-later, so we are embedding three GPL path strings — see the NOTICE remark in icon.rs.
-icondata = { version = "0.7", default-features = false, features = ["tabler-icons", "ico-moon-free"] }
-# Direct handle on the `IconData` struct to stitch the partial-selection marker (box + dot) from the IcoMoon checkbox paths; already a transitive dep of `icondata`, so this adds nothing new to the build.
+# Status glyphs (markers, carets, file kinds, sort arrows) from one pack; syncative uses the same crate and pack, so the glyphs match its UI. The `box-icons` feature adds the three selection checkboxes (MIT).
+icondata = { version = "0.7", default-features = false, features = ["tabler-icons", "box-icons"] }
+# Direct handle on the `IconData` struct to crop the checkboxes' viewBox and to build glyphs from the Material Icon Theme's SVGs; already a transitive dep of `icondata`, so this adds nothing new to the build.
 icondata_core = "0.1"
 
 [dev-dependencies]
