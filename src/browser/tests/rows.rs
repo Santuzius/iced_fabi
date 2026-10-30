@@ -251,3 +251,40 @@ fn set_columns_replaces_everything_but_the_name_anchor() {
         "a sort column past the end fell back to Name"
     );
 }
+
+/// The caret of a tree row by name.
+fn caret(browser: &Browser, name: &str) -> bool {
+    browser.tree_rows().iter().find(|row| browser.node(row.id).is_some_and(|n| n.name == name)).expect("row is shown").expandable
+}
+
+#[test]
+fn a_folder_marked_empty_has_no_caret_and_is_never_loaded() {
+    let mut browser = Browser::new("root");
+    browser.set_mode(crate::Mode::Tree);
+    browser.set_children(NodeId::ROOT, vec![Entry::folder("Empty").empty(), Entry::folder("Unknown")]);
+    assert!(!caret(&browser, "Empty"));
+    assert!(caret(&browser, "Unknown"), "a folder not loaded yet keeps its caret");
+    let empty = NodeId::derive(NodeId::ROOT, EntryKind::Folder, "Empty");
+    assert_eq!(browser.activate(empty), crate::Outcome::None);
+}
+
+#[test]
+fn a_folder_loses_its_caret_once_its_listing_comes_back_empty() {
+    let mut browser = Browser::new("root");
+    browser.set_mode(crate::Mode::Tree);
+    browser.set_folders_only(true);
+    browser.set_children(NodeId::ROOT, vec![Entry::folder("Photos")]);
+    let photos = NodeId::derive(NodeId::ROOT, EntryKind::Folder, "Photos");
+    // Only files inside: a folders-only browser has nothing to show below it.
+    browser.set_children(photos, vec![Entry::file("a.jpg")]);
+    assert!(!caret(&browser, "Photos"));
+}
+
+#[test]
+fn a_parent_listed_again_without_the_mark_lets_the_folder_load() {
+    let mut browser = Browser::new("root");
+    browser.set_children(NodeId::ROOT, vec![Entry::folder("Grows").empty()]);
+    browser.set_children(NodeId::ROOT, vec![Entry::folder("Grows")]);
+    let grows = NodeId::derive(NodeId::ROOT, EntryKind::Folder, "Grows");
+    assert_eq!(browser.activate(grows), crate::Outcome::NeedsLoad(grows));
+}

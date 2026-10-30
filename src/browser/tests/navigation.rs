@@ -19,6 +19,7 @@ fn activate_walks_path_and_loads_once() {
             kind: EntryKind::Folder,
             size: None,
             modified: None,
+            empty: false,
         }],
     );
     let krypto = NodeId::derive(folder, EntryKind::Folder, "Krypto");
@@ -62,6 +63,7 @@ fn a_scope_under_a_selected_ancestor_shares_its_selection() {
             kind: EntryKind::File,
             size: None,
             modified: None,
+            empty: false,
         }],
     );
     let _ = browser.activate(folder); // browse into it, then check an ancestor

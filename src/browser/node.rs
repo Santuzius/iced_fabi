@@ -57,6 +57,8 @@ pub struct Entry {
     pub size: Option<u64>,
     /// Seconds since the Unix epoch; `None` renders empty and sorts first ascending.
     pub modified: Option<i64>,
+    /// A folder known to hold nothing the browser would list (see [`empty`](Self::empty)).
+    pub empty: bool,
 }
 
 impl Entry {
@@ -67,6 +69,7 @@ impl Entry {
             kind: EntryKind::Folder,
             size: None,
             modified: None,
+            empty: false,
         }
     }
 
@@ -77,6 +80,7 @@ impl Entry {
             kind: EntryKind::File,
             size: None,
             modified: None,
+            empty: false,
         }
     }
 
@@ -91,6 +95,13 @@ impl Entry {
     #[must_use]
     pub fn modified(mut self, seconds_since_epoch: i64) -> Self {
         self.modified = Some(seconds_since_epoch);
+        self
+    }
+
+    /// Mark a folder as holding nothing the browser would list — no subfolders for a [folders-only](crate::Browser::set_folders_only) browser, nothing at all otherwise — when the backend can tell cheaply, as a local disk can. The tree then shows it without an expand caret and the browser never asks to load it; opening it in browse mode shows it empty. A later listing of its parent without the mark lets it be loaded again. Folders without the mark lose their caret too, once their listing comes back empty.
+    #[must_use]
+    pub fn empty(mut self) -> Self {
+        self.empty = self.kind == EntryKind::Folder;
         self
     }
 }

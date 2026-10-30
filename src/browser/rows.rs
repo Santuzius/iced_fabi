@@ -132,11 +132,13 @@ impl Browser {
         rows.push(Row {
             id,
             depth,
-            expandable: node.kind == EntryKind::Folder,
+            // A folder whose listing is known and holds nothing listed has nothing to expand.
+            expandable: node.kind == EntryKind::Folder
+                && (!node.children_known || node.children.iter().any(|child| self.is_listed(*child))),
             expanded,
             marker: self.marker_with(id, partial, covered),
         });
-        // A file has no children; an unlisted folder shows no child rows until loaded, but keeps its caret (see `expandable`).
+        // A file has no children; a folder not loaded yet shows no child rows, but keeps its caret (see `expandable`).
         if expanded {
             let below = covered || (self.units_cover() && self.selected.contains(&id));
             for child in self.sorted(&node.children) {

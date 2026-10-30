@@ -48,6 +48,7 @@ impl Browser {
             return;
         }
         let mut next = Vec::with_capacity(entries.len());
+        let mut emptied: Vec<NodeId> = Vec::new();
         let mut fresh: HashSet<NodeId> = HashSet::with_capacity(entries.len());
         for entry in entries {
             let child_id = NodeId::derive(id, entry.kind, &entry.name);
@@ -70,7 +71,20 @@ impl Browser {
             node.kind = entry.kind;
             node.size = entry.size;
             node.modified = entry.modified;
+            if entry.empty {
+                // Known empty: nothing to load, and whatever an earlier listing put below it is gone.
+                node.children_known = true;
+                node.loading = false;
+                node.failed = false;
+                emptied.append(&mut node.children);
+            } else if node.children_known && node.children.is_empty() {
+                // Empty before, maybe not any more: the next activation asks again.
+                node.children_known = false;
+            }
             next.push(child_id);
+        }
+        for gone in emptied {
+            self.prune(gone);
         }
         let Some(parent) = self.nodes.get_mut(&id) else {
             return;
