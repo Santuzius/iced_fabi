@@ -71,6 +71,11 @@ impl Browser {
             return Outcome::FileOpened(id);
         }
         if self.mode == Mode::Tree {
+            // Known to be empty: nothing to open, so the row stays as it is.
+            if self.holds_nothing_listed(id) {
+                self.expanded.remove(&id);
+                return Outcome::None;
+            }
             let now_expanded = !self.expanded.contains(&id);
             if now_expanded {
                 self.expanded.insert(id);

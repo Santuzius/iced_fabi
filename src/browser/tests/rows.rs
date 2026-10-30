@@ -288,3 +288,20 @@ fn a_parent_listed_again_without_the_mark_lets_the_folder_load() {
     let grows = NodeId::derive(NodeId::ROOT, EntryKind::Folder, "Grows");
     assert_eq!(browser.activate(grows), crate::Outcome::NeedsLoad(grows));
 }
+
+#[test]
+fn tapping_an_empty_folder_in_the_tree_changes_nothing() {
+    let mut browser = Browser::new("root");
+    browser.set_mode(crate::Mode::Tree);
+    browser.set_children(NodeId::ROOT, vec![Entry::folder("Empty").empty(), Entry::folder("Later")]);
+    let empty = NodeId::derive(NodeId::ROOT, EntryKind::Folder, "Empty");
+    let _ = browser.activate(empty);
+    assert!(!browser.is_expanded(empty));
+
+    // A folder found empty only after it was opened shows closed again.
+    let later = NodeId::derive(NodeId::ROOT, EntryKind::Folder, "Later");
+    assert_eq!(browser.activate(later), crate::Outcome::NeedsLoad(later));
+    browser.set_children(later, Vec::new());
+    let row = browser.tree_rows().into_iter().find(|row| row.id == later).unwrap();
+    assert!(!row.expanded && !row.expandable);
+}

@@ -54,6 +54,11 @@ impl Browser {
     }
 
     /// Whether the node's row appears in the lists under the current visibility settings.
+    /// Whether `id` is a node whose listing is known and holds nothing this browser lists: such a folder has nothing to expand.
+    pub(super) fn holds_nothing_listed(&self, id: NodeId) -> bool {
+        self.nodes.get(&id).is_some_and(|node| node.children_known && !node.children.iter().any(|child| self.is_listed(*child)))
+    }
+
     pub(super) fn is_listed(&self, id: NodeId) -> bool {
         let Some(node) = self.nodes.get(&id) else {
             return false;
@@ -129,13 +134,13 @@ impl Browser {
         if !self.is_listed(id) {
             return;
         }
+        let expandable = node.kind == EntryKind::Folder && !self.holds_nothing_listed(id);
         rows.push(Row {
             id,
             depth,
-            // A folder whose listing is known and holds nothing listed has nothing to expand.
-            expandable: node.kind == EntryKind::Folder
-                && (!node.children_known || node.children.iter().any(|child| self.is_listed(*child))),
-            expanded,
+            expandable,
+            // A branch that turned out empty after it was opened shows closed, its glyph included.
+            expanded: expanded && expandable,
             marker: self.marker_with(id, partial, covered),
         });
         // A file has no children; a folder not loaded yet shows no child rows, but keeps its caret (see `expandable`).
