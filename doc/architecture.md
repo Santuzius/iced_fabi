@@ -16,7 +16,8 @@ One crate, two halves: the state (`browser/`) and the widget (`cabinet/`), plus 
   - `rows.rs` — `browse_rows` / `tree_rows` and the sorting plus the visibility filters (`folders_only`, `file_extensions`) that decide which entries appear.
   - `tests/` — one file per topic module; the shared root listing is `Browser::sample`.
 - `src/cabinet/` — the [`Cabinet`](crate::Cabinet) widget, rebuilt per frame:
-  - `mod.rs` — the struct, builder setters (all settings in one place), `build`, and `Separators`.
+  - `mod.rs` — the struct, builder setters (all settings in one place), `build`, and `Separators`; `build` wraps the frame in iced's `responsive`, so the columns are fitted to each width before the frame is built.
+  - `fit.rs` — sharing the width among the columns: each value column keeps its `min_width`, the Name column gives way down to a floor, the rightmost columns are left out where even that does not fit.
   - `paint.rs` — geometry constants, the `ColourField` colour selector, flat-button, rule and background-layer helpers, the column `template` header and rows share (its `rules` argument says which rows carry the upright rules, hidden columns are skipped whole), and `stripe_of` for the zebra colour.
   - `toolbar.rs` — breadcrumbs, mode switch, tool groups; browser-hidden tools drop out before the pure separator-collapsing rule `prune_separators`, which has its own tests; a tool press routes by `event_on_press` first, then a confirming tool's press opens its modal, else the tool's message goes out.
   - `header.rs` — the select-all box, sort buttons, selection count.
@@ -27,7 +28,7 @@ One crate, two halves: the state (`browser/`) and the widget (`cabinet/`), plus 
   - `confirmation.rs` — the tool confirmation modal: the shell filled with a `ToolConfirmation`'s title, question and action-named button; the pending tool is looked up among the frame's tools and re-asked, so the words track the live selection.
   - `labels.rs` — the `Labels` (status lines, count line, dialog words) and `Cabinet::labels`.
   - `cut.rs` — the ellipsis label (a plain iced `Widget`).
-- `src/column.rs` — the [`Column`](crate::Column) trait (header, `id`, width, cell, compare), the built-in Name/Modified/Size columns, the `BuiltInColumn` unit enum (fixed `id`s: `name`/`modified`/`size`) and the `ColumnKey` (`built_in`/`custom`) used by the visibility lists.
+- `src/column.rs` — the [`Column`](crate::Column) trait (header, `id`, width, `min_width`, cell, compare), the built-in Name/Modified/Size columns, the `BuiltInColumn` unit enum (fixed `id`s: `name`/`modified`/`size`) and the `ColumnKey` (`built_in`/`custom`) used by the visibility lists.
 - `src/natural.rs` — natural ("File 2" < "File 10") comparison keys.
 - `src/format.rs` — `format_bytes`, `format_epoch`.
 - `src/tool.rs` — the toolbar [`Tool`](crate::Tool) trait (glyph, optional `id`, enabled, message, optional `event_on_press` and `confirmation` hook), the `ToolConfirmation` a confirming tool's modal shows (with its [`ConfirmTone`](crate::ConfirmTone) — accent or danger fill), the closure-built [`SimpleTool`](crate::SimpleTool) (`.id(..)` gives it a switch id), the `BuiltInTool` unit enum (`ALL`, fixed `id`s) and the `ToolKey` used by the visibility configuration.

@@ -6,6 +6,7 @@ mod action;
 mod confirmation;
 mod cut;
 mod dialog;
+mod fit;
 mod header;
 mod labels;
 mod list;
@@ -102,6 +103,8 @@ pub struct Cabinet<'a, Message: Clone, Renderer> {
     pub(super) text_size: Option<Pixels>,
     pub(super) font: Option<Font>,
     pub(super) scrollbar: Option<(scrollable::Direction, ScrollbarStyle<'a>)>,
+    /// The width each column gets in this layout pass, by column index (`None`: hidden or left out for lack of room); set from the cabinet's width before each build of the frame.
+    pub(super) fitted: std::cell::RefCell<Vec<Option<crate::column::ColumnWidth>>>,
     pub(super) _renderer: std::marker::PhantomData<fn() -> Renderer>,
 }
 
@@ -129,6 +132,7 @@ where
         text_size: None,
         font: None,
         scrollbar: None,
+        fitted: std::cell::RefCell::new(Vec::new()),
         _renderer: std::marker::PhantomData,
     }
 }
@@ -252,6 +256,39 @@ where
 
     /// Assemble the frame. The same thing `.into()` does — pick whichever reads better in your chain.
     pub fn build(self) -> Element<'a, Message, Theme, Renderer> {
+        let (width, height) = (self.width, self.height);
+        let cabinet = Rc::new(self);
+        // Rebuilt whenever the width changes: the columns fit themselves to it.
+        let content = iced_widget::responsive(move |size| {
+            cabinet.fit_columns(size.width);
+            cabinet.frame()
+        });
+        container(content).width(width).height(height).into()
+    }
+
+    /// Share `width` out among the visible columns (see [`fit`](fit::fit)) for the template to read.
+    fn fit_columns(&self, width: f32) {
+        let em = self.text_size.map_or(16.0, f32::from);
+        let pad = 2.0 * paint::CELL_PAD;
+        let visible: Vec<usize> = (0..self.browser.column_count()).filter(|index| !self.browser.is_column_hidden_at(*index)).collect();
+        let wants: Vec<fit::Want> = visible
+            .iter()
+            .filter_map(|index| self.browser.column(*index))
+            .map(|column| fit::Want { width: column.width(), min: column.min_width() * em + pad })
+            .collect();
+        let rule = if self.separators.vertical() { 1.0 } else { 0.0 };
+        let marker = if self.boxes_shown() { paint::MARKER_CELL } else { 0.0 };
+        let available = width - 2.0 * (paint::EDGE + paint::FRAME) - marker - rule * (visible.len() + 1) as f32;
+        let fitted = fit::fit(&wants, available, fit::NAME_FLOOR * em + pad, rule);
+        let mut by_index = vec![None; self.browser.column_count()];
+        for (index, width) in visible.into_iter().zip(fitted) {
+            by_index[index] = width;
+        }
+        *self.fitted.borrow_mut() = by_index;
+    }
+
+    /// Toolbar, header, rows and footer, with any modal over them.
+    fn frame(&self) -> Element<'a, Message, Theme, Renderer> {
         let list = match self.browser.mode() {
             Mode::Browse => self.browse_list(),
             Mode::Tree => self.tree_list(),
@@ -295,10 +332,7 @@ where
             Some(modal) => iced_widget::stack![body, modal].into(),
             None => body,
         };
-        container(content)
-            .width(self.width)
-            .height(self.height)
-            .into()
+        content
     }
 }
 

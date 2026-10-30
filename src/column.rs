@@ -62,6 +62,11 @@ pub trait Column {
         ColumnWidth::Portion(2)
     }
 
+    /// The narrowest width at which the column's cells still read, in multiples of the text size (em), cell padding not included. Where its share of a narrow cabinet would be smaller, the column keeps this width and the Name column gives way; where not even that fits, the rightmost columns are left out. Default: 8 em.
+    fn min_width(&self) -> f32 {
+        8.0
+    }
+
     /// Stable identity for configuration lists such as [`Browser::set_visible_columns`](Browser::set_visible_columns), which name columns instead of counting indices. Defaults to the header; the built-in columns return a fixed id, so renaming one with `with_header` never breaks a configuration that lists it. A custom column usually keeps the default, and fixes its id here when the header is localized.
     fn id(&self) -> String {
         self.header()
@@ -114,6 +119,11 @@ impl Column for NameColumn {
     fn width(&self) -> ColumnWidth {
         // The largest share by default, as in Proton Drive and KDE Dolphin: the name is what a file list is for, and in tree mode the indent eats into this column.
         ColumnWidth::Portion(4)
+    }
+
+    fn min_width(&self) -> f32 {
+        // Glyph and gap included, room for about 15 characters; under pressure it shrinks further (see `cabinet::fit`).
+        10.0
     }
 
     fn cell(&self, _browser: &Browser, node: &Node) -> Cell {
@@ -170,6 +180,11 @@ impl Column for ModifiedColumn {
 
     fn id(&self) -> String {
         "modified".into()
+    }
+
+    fn min_width(&self) -> f32 {
+        // The default format, "Oct 13, 2026, 07:31".
+        10.5
     }
 
     fn cell(&self, _browser: &Browser, node: &Node) -> Cell {
@@ -230,6 +245,11 @@ impl Column for SizeColumn {
         "size".into()
     }
 
+    fn min_width(&self) -> f32 {
+        // "1023.9 MB".
+        5.5
+    }
+
     fn cell(&self, _browser: &Browser, node: &Node) -> Cell {
         Cell::Text {
             text: node.size.map(|s| (self.format)(s)).unwrap_or_default(),
@@ -264,6 +284,10 @@ impl Column for BuiltInColumn {
 
     fn width(&self) -> ColumnWidth {
         self.column().width()
+    }
+
+    fn min_width(&self) -> f32 {
+        self.column().min_width()
     }
 
     fn cell(&self, browser: &Browser, node: &Node) -> Cell {

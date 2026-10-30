@@ -16,7 +16,7 @@ One line per entry: what the part is for and what to look for in it, as in `doc/
 EXAMPLE=cloud_browse BUILD='cargo build --example cloud_browse --features material-icon-theme' WAIT=0 agent-screenshot temp/subtle.png 'sleep 2' 'mousemove --window $WID 155 73' 'sleep 0.5' 'click 1' 'sleep 0.8' 'mousemove --window $WID 115 165' 'sleep 0.3' 'click 1' 'sleep 0.8'
 ```
 
-The window is 1300×760 at root (0,0), so PNG pixels equal `--window $WID` coordinates. Timing that works: `sleep 2` after launch, `sleep 0.5` before each click, `sleep 0.8` after (`WAIT=0`, sleeps as steps). The demo starts in Syncative dark with Zebra off. The pick list ignores keys, so click and never use arrows or Return.
+The window is 1300×760 at root (0,0), so PNG pixels equal `--window $WID` coordinates. A step `'windowsize $WID 420 760'` (then `'sleep 1.5'`) shrinks it to phone width, where the columns fit themselves (Name and Modified at 420 px, all four at 640 px). Timing that works: `sleep 2` after launch, `sleep 0.5` before each click, `sleep 0.8` after (`WAIT=0`, sleeps as steps). The demo starts in Syncative dark with Zebra off. The pick list ignores keys, so click and never use arrows or Return.
 
 Item centres, measured from the pixels and hit 6 of 6 times in one try each (open the menu, then click the entry's centre):
 
