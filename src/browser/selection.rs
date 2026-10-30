@@ -137,7 +137,7 @@ impl Browser {
         self.pending.clear();
     }
 
-    /// The marker of the header's select-all box: ticked when the scope, one of its ancestors, or every one of its children is selected, a dot when something below the scope is.
+    /// The marker of the header's select-all box: ticked when the scope, one of its ancestors, or every one of its children is selected, a minus when something below the scope is.
     pub fn scope_marker(&self) -> Marker {
         let scope = self.scope();
         let children: Vec<NodeId> = self
@@ -224,7 +224,7 @@ impl Browser {
         self.settle_pending();
     }
 
-    /// The marker this node shows: a tick when it is selected, explicitly or covered by a selected ancestor (in [`Selection::Multiple`] only), a dot when something below it is selected, otherwise an empty box. A covered node therefore looks selected, mirroring what [`toggle`](Self::toggle) does when one of its boxes is tapped.
+    /// The marker this node shows: a tick when it is selected, explicitly or covered by a selected ancestor (in [`Selection::Multiple`] only), a minus when something below it is selected, otherwise an empty box. A covered node therefore looks selected, mirroring what [`toggle`](Self::toggle) does when one of its boxes is tapped.
     pub fn marker(&self, id: NodeId) -> Marker {
         if self.selected.contains(&id) || self.selected_ancestor(id).is_some() {
             Marker::Selected
@@ -288,7 +288,7 @@ impl Browser {
 
     /// Toggle the unit selection of a node. With [`Selection::None`](Selection::None) this does nothing.
     ///
-    /// Rules (Material-inspired): a node under a selected ancestor shows a tick because the ancestor's unit covers it, and clicking its box removes just that entry from the selection — the sibling rows stay ticked and the ancestors become dots (the unit is dissolved along the chain from the ancestor down); selecting a folder that had explicit selections below clears them, because the folder now stands for its whole subtree. In [`Selection::Single`](Selection::Single) a selected folder does not cover its content: tapping the selected entry leaves nothing selected, tapping any other — one inside a selected folder too — makes it the one selection.
+    /// Rules (Material-inspired): a node under a selected ancestor shows a tick because the ancestor's unit covers it, and clicking its box removes just that entry from the selection — the sibling rows stay ticked and the ancestors show a minus (the unit is dissolved along the chain from the ancestor down); selecting a folder that had explicit selections below clears them, because the folder now stands for its whole subtree. In [`Selection::Single`](Selection::Single) a selected folder does not cover its content: tapping the selected entry leaves nothing selected, tapping any other — one inside a selected folder too — makes it the one selection.
     pub fn toggle(&mut self, id: NodeId) {
         if self.selection == Selection::None || !self.nodes.contains_key(&id) {
             return;

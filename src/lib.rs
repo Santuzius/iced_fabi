@@ -7,7 +7,7 @@
 //! - [`Mode::Browse`]: one directory per screen with a breadcrumb bar, Android Documents-App style.
 //! - [`Mode::Tree`]: the whole tree in place, every branch expandable — selection can span several levels at once.
 //!
-//! Material-style selection on every row: a box, a tick when the item is selected as a unit, and a dot when something inside it is selected ([`Marker`]); the header's box selects or clears the whole list. The listings themselves come from the application: the widget only says which nodes need loading ([`Outcome::NeedsLoad`]), the app answers with [`Browser::set_children`] — from disk, rclone, or an HTTP API.
+//! Material-style selection on every row: a box, a tick when the item is selected as a unit, and a minus when something inside it is selected ([`Marker`]); the header's box selects or clears the whole list. The listings themselves come from the application: the widget only says which nodes need loading ([`Outcome::NeedsLoad`]), the app answers with [`Browser::set_children`] — from disk, rclone, or an HTTP API.
 //!
 //! The widget is configured through the [`Cabinet`] builder: toolbar [`Tool`]s in groups ([`Cabinet::built_in_tools`] for the built-in set, [`Cabinet::tool_separator`] between them, besides the built-in mode switch), one [`ActionButton`](Cabinet::action) for the selection, custom [`Column`]s (registered on the [`Browser`]), a [`Style`] hook so an app's own theme (its palette, or a fork's) drives every colour, and a [`RowIcons`] hook for the file/folder glyphs (its own icon pack, tinted or multicolour).
 //!

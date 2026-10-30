@@ -29,6 +29,8 @@ Item centres, measured from the pixels and hit 6 of 6 times in one try each (ope
 
 The `picker` example (`EXAMPLE=picker`, window 900×620, Default dark) opens its pickers from the Browse buttons at `x = 828`: Folder `y = 84`, Excluded `133`, Hidden `182`. In the open picker card (`x 140–759`) the row checkboxes sit at `x = 166`, rows 36 px apart from `y = 214`, row names from `x ≈ 220`; the footer's confirm button is centred at `(720, 529)` for "Save" and `(683, 529)` for "Use this folder", Cancel at `(645, 529)` and `(570, 529)`.
 
+The README's `doc/images/cloud_browse.png` is the demo as it starts, with Dokumente ticked: `agent-screenshot doc/images/cloud_browse.png 'sleep 2' 'mousemove --window $WID 49 252' 'sleep 0.5' 'click 1' 'sleep 0.8'` with the `EXAMPLE`, `BUILD` and `WAIT` above. Retake it when the look changes.
+
 For a target that is not listed, take the shot with `GRID=50` and no steps, then measure its colour bands with `SCAN=300` (or `agent-screenshot --scan temp/shot.png 300` on a shot taken without `GRID`): each band's `y` range and RGB down column 300, `SCAN=y=178` for a row.
 
 ## Verifying zebra stripes against the header
