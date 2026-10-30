@@ -10,10 +10,10 @@ One line per entry: what the part is for and what to look for in it, as in `doc/
 
 ## Checking a UI change on screen
 
-`agent-screenshot` runs the `cloud_browse` example (`examples/cloud_browse/`) on a private Xvfb screen and saves a PNG of its window. From the repo root, one xdotool step per argument, `$WID` the window:
+`agent-screenshot` runs the `cloud_browse` example (`examples/cloud_browse/`) on a private Xvfb screen and saves a PNG of its window. From the repo root, one xdotool step per argument, `$WID` the window; the example needs the `material-icon-theme` feature, hence the `BUILD`:
 
 ```sh
-EXAMPLE=cloud_browse WAIT=0 agent-screenshot temp/subtle.png 'sleep 2' 'mousemove --window $WID 155 73' 'sleep 0.5' 'click 1' 'sleep 0.8' 'mousemove --window $WID 115 165' 'sleep 0.3' 'click 1' 'sleep 0.8'
+EXAMPLE=cloud_browse BUILD='cargo build --example cloud_browse --features material-icon-theme' WAIT=0 agent-screenshot temp/subtle.png 'sleep 2' 'mousemove --window $WID 155 73' 'sleep 0.5' 'click 1' 'sleep 0.8' 'mousemove --window $WID 115 165' 'sleep 0.3' 'click 1' 'sleep 0.8'
 ```
 
 The window is 1300×760 at root (0,0), so PNG pixels equal `--window $WID` coordinates. Timing that works: `sleep 2` after launch, `sleep 0.5` before each click, `sleep 0.8` after (`WAIT=0`, sleeps as steps). The demo starts in Syncative dark with Zebra off. The pick list ignores keys, so click and never use arrows or Return.

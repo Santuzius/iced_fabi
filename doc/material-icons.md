@@ -1,11 +1,11 @@
-# The Material Icon Theme cut (examples/assets/material-icon-theme/)
+# The Material Icon Theme cut (assets/material-icon-theme/)
 
-- Content: 29 unmodified SVGs (26 language/format icons + the three defaults file/folder/folder-open) + LICENSE; the `cloud_browse` example maps ~30 extensions to them in [`examples/cloud_browse/icons.rs`](../examples/cloud_browse/icons.rs).
+- Content: 29 unmodified SVGs (26 language/format icons + the three defaults file/folder/folder-open) + LICENSE; `MaterialIconTheme` (feature `material-icon-theme`) maps ~30 extensions to them in [`src/material.rs`](../src/material.rs).
 - Source: Material Icon Theme v5.39.0, fetched 2026-10-25, each file byte-compared (`cmp`) against the artifact. 26 come from `icons/` at tag `v5.39.0` of <https://github.com/material-extensions/vscode-material-icon-theme>; `file.svg`, `folder.svg`, `folder-open.svg` come from the npm package `material-icon-theme@5.39.0` — the git tree's `icons/` does not carry those three (the theme generates them at package build time; Iconify serves them as "hidden" icons of the same collection).
-- The demo's extension mapping follows the theme's own table (`dist/material-icons.json` in the npm package, key `fileExtensions`): `xls`/`xlsx` → `table` (there is no `excel.svg`), `txt` → `document`, `sh` → `console`, `7z`/`rar` → `zip`.
-- Binary size: whole cut ~16 KB on disk, embedded only in the example via `include_str!`; the library itself carries no Material icons (its status glyphs are Tabler, a crates.io dependency of `icondata`, nothing vendored).
+- The extension mapping follows the theme's own table (`dist/material-icons.json` in the npm package, key `fileExtensions`): `xls`/`xlsx` → `table` (there is no `excel.svg`), `txt` → `document`, `sh` → `console`, `7z`/`rar` → `zip`.
+- Binary size: whole cut ~16 KB on disk, embedded via `include_str!` only with the `material-icon-theme` feature; without it the library carries no Material icons (its status glyphs are Tabler, a crates.io dependency of `icondata`, nothing vendored).
 - Why a vendored cut, researched 2026-10-25:
-  - Git submodule of the theme repo: `cargo package`/`publish` leave submodule contents out of the `.crate` (rust-lang/cargo#2657, #8635) — the examples would not build for published users; a plain clone leaves the directory empty; the repo is ~170 MB for 713 KB of `icons/`.
+  - Git submodule of the theme repo: `cargo package`/`publish` leave submodule contents out of the `.crate` (rust-lang/cargo#2657, #8635) — the feature would not build for published users; a plain clone leaves the directory empty; the repo is ~170 MB for 713 KB of `icons/`.
   - The crates.io crate `material-code-icons` (which did exactly the submodule approach): its published build panics in `build.rs`, and as a git dependency it panics the same way (verified by building both forms 2026-10-25); repo unmaintained since 2022-12.
   - `icondata` has no Material-Icon-Theme set: its `vs-code-icons` feature is VS Code's *product* icons (monochrome codicons), and `material-*` are Google/Pictogrammers UI glyphs.
 - Updating the cut: fetch new files from a newer tag's `icons/` (names can change), take any changed defaults from that version's npm package, keep `LICENSE` in sync with upstream, and adjust the mapping only if the theme's `fileExtensions` table changed.

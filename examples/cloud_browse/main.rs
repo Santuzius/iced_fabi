@@ -64,7 +64,6 @@ impl From<BuiltInTool> for Message {
 // --- the pieces the demo is built from ---
 
 mod choices;
-mod icons;
 mod theme;
 
 use choices::{
@@ -72,7 +71,7 @@ use choices::{
     ICON_CHOICES, INACTIVE_CHOICES, IconChoice, InactiveChoice, LINES, MODE_SWITCH,
     ModeSwitchChoice, SELECTION_CHOICES, SelectionChoice, THEMES, ThemeChoice, ZEBRA, ZebraChoice,
 };
-use icons::MaterialIconTheme;
+use iced_fabi::MaterialIconTheme;
 use theme::{
     SYNCATIVE_DARK, SYNCATIVE_FONT, SYNCATIVE_LIGHT, SYNCATIVE_TEXT, syncative_card,
     syncative_header_bar, syncative_menu, syncative_page, syncative_pick_list,

@@ -32,6 +32,7 @@ One crate, two halves: the state (`browser/`) and the widget (`cabinet/`), plus 
 - `src/format.rs` — `format_bytes`, `format_epoch`.
 - `src/tool.rs` — the toolbar [`Tool`](crate::Tool) trait (glyph, optional `id`, enabled, message, optional `event_on_press` and `confirmation` hook), the `ToolConfirmation` a confirming tool's modal shows (with its [`ConfirmTone`](crate::ConfirmTone) — accent or danger fill), the closure-built [`SimpleTool`](crate::SimpleTool) (`.id(..)` gives it a switch id), the `BuiltInTool` unit enum (`ALL`, fixed `id`s) and the `ToolKey` used by the visibility configuration.
 - `src/icon.rs` — cached SVG handles, the glyph constants, and the [`RowIcons`](crate::RowIcons) hook with `TablerIcons`.
+- `src/material.rs` — feature `material-icon-theme`: `MaterialIconTheme`, the vendored SVGs in `assets/material-icon-theme/` read into glyphs, files looked up by lower-cased extension.
 - `src/event.rs` — the [`Event`](crate::Event) enum the widget emits.
 - `src/style.rs` — the [`Style`](crate::Style) palette hook (`Style::from_theme` is the default).
 

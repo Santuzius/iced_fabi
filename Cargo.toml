@@ -10,6 +10,10 @@ readme = "README.md"
 keywords = ["iced", "widget", "file", "browser", "tree"]
 categories = ["gui"]
 
+[features]
+# `MaterialIconTheme`: file and folder glyphs from the Material Icon Theme for VS Code, a vendored cut of 29 SVGs (~16 KB) under assets/material-icon-theme/.
+material-icon-theme = []
+
 [dependencies]
 # Only the widgets, so the crate brings no renderer, window system or executor of its own. Apps on an iced fork patch `iced_widget` with the fork's (their `[patch.crates-io]`), so Cargo builds a single copy of iced. The icons are SVG documents, hence the `svg` feature.
 iced_widget = { version = "0.14", features = ["svg"] }
@@ -21,3 +25,8 @@ icondata_core = "0.1"
 [dev-dependencies]
 # The examples are real apps; they pull the windowing and the executor (the same runtime syncative uses, for `iced::time::every`).
 iced = { version = "0.14", features = ["svg", "tokio"] }
+
+# The demo's icon-pack switch offers the Material Icon Theme.
+[[example]]
+name = "cloud_browse"
+required-features = ["material-icon-theme"]

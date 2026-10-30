@@ -91,6 +91,8 @@ mod column;
 mod event;
 mod format;
 mod icon;
+#[cfg(feature = "material-icon-theme")]
+mod material;
 mod natural;
 mod style;
 mod tool;
@@ -106,5 +108,7 @@ pub use column::{
 pub use event::Event;
 pub use format::{format_bytes, format_epoch};
 pub use icon::{RowIcons, TablerIcons};
+#[cfg(feature = "material-icon-theme")]
+pub use material::MaterialIconTheme;
 pub use style::Style;
 pub use tool::{BuiltInTool, ConfirmTone, SimpleTool, Tool, ToolConfirmation, ToolKey, tool};
