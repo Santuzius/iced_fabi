@@ -17,7 +17,7 @@ One crate, two halves: the state (`browser/`) and the widget (`cabinet/`), plus 
   - `tests/` — one file per topic module; the shared root listing is `Browser::sample`.
 - `src/cabinet/` — the [`Cabinet`](crate::Cabinet) widget, rebuilt per frame:
   - `mod.rs` — the struct, builder setters (all settings in one place), `build`, and `Separators`; `build` wraps the frame in iced's `responsive`, so the columns are fitted to each width before the frame is built.
-  - `fit.rs` — sharing the width among the columns: each value column keeps its `min_width`, the Name column gives way down to a floor, the rightmost columns are left out where even that does not fit.
+  - `fit.rs` — sharing the width among the columns: each value column keeps its `min_width`, the Name column gives way down to a floor, the rightmost columns are left out where even that does not fit. In tree mode the Name column does not give way: it keeps its minimum plus the deepest row's indent and caret (`Cabinet::fit_columns`).
   - `paint.rs` — geometry constants, the `ColourField` colour selector, flat-button, rule and background-layer helpers, the column `template` header and rows share (its `rules` argument says which rows carry the upright rules, hidden columns are skipped whole), and `stripe_of` for the zebra colour.
   - `toolbar.rs` — breadcrumbs, mode switch, tool groups; browser-hidden tools drop out before the pure separator-collapsing rule `prune_separators`, which has its own tests; a tool press routes by `event_on_press` first, then a confirming tool's press opens its modal, else the tool's message goes out.
   - `header.rs` — the select-all box, sort buttons, selection count.

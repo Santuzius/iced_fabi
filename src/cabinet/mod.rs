@@ -271,15 +271,24 @@ where
         let em = self.text_size.map_or(16.0, f32::from);
         let pad = 2.0 * paint::CELL_PAD;
         let visible: Vec<usize> = (0..self.browser.column_count()).filter(|index| !self.browser.is_column_hidden_at(*index)).collect();
-        let wants: Vec<fit::Want> = visible
+        let mut wants: Vec<fit::Want> = visible
             .iter()
             .filter_map(|index| self.browser.column(*index))
             .map(|column| fit::Want { width: column.width(), min: column.min_width() * em + pad })
             .collect();
+        let mut floor = fit::NAME_FLOOR * em + pad;
+        // In tree mode the names start behind the caret and their level's indent, so the Name column keeps its full minimum on top of the deepest row's lead: where that leaves no room, the value columns go rather than the names.
+        if self.browser.mode() == Mode::Tree
+            && let Some(name) = wants.first_mut()
+        {
+            let depth = self.browser.tree_rows().iter().map(|row| row.depth).max().unwrap_or(0);
+            name.min += paint::INDENT * depth as f32 + paint::CARET + paint::GAP;
+            floor = name.min;
+        }
         let rule = if self.separators.vertical() { 1.0 } else { 0.0 };
         let marker = if self.boxes_shown() { paint::MARKER_CELL } else { 0.0 };
         let available = width - 2.0 * (paint::EDGE + paint::FRAME) - marker - rule * (visible.len() + 1) as f32;
-        let fitted = fit::fit(&wants, available, fit::NAME_FLOOR * em + pad, rule);
+        let fitted = fit::fit(&wants, available, floor, rule);
         let mut by_index = vec![None; self.browser.column_count()];
         for (index, width) in visible.into_iter().zip(fitted) {
             by_index[index] = width;
@@ -346,6 +355,22 @@ mod tests {
         assert!(Separators::HeaderOnly.header_rules());
         assert!(!Separators::HeaderOnly.horizontal());
         assert!(!Separators::HeaderOnly.vertical());
+    }
+
+    /// At phone width the browse list keeps Modified beside a shrunken Name column; the tree, whose names need their indent and caret, leaves it out.
+    #[test]
+    fn the_tree_gives_up_modified_on_a_phone_and_the_list_keeps_it() {
+        let mut browser = Browser::new("root");
+        browser.hide_column(crate::BuiltInColumn::Size);
+        let modified_at = |browser: &Browser, width: f32| {
+            let cabinet: Cabinet<'_, (), ()> = cabinet(browser, |_| ()).text_size(14);
+            cabinet.fit_columns(width);
+            cabinet.fitted.borrow()[1].is_some()
+        };
+        assert!(modified_at(&browser, 380.0));
+        browser.set_mode(Mode::Tree);
+        assert!(!modified_at(&browser, 380.0));
+        assert!(modified_at(&browser, 620.0));
     }
 
     /// Everywhere else the header is gridded exactly like the rows.
